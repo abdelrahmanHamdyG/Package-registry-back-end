@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2016",                                  /* Set the JavaScript language version for emitted JavaScript. */
+    "module": "NodeNext",                                  /* Use ESNext module system (ES Modules). */
+    "moduleResolution": "nodenext",                      /* Enable Node.js module resolution for ES Modules. */
+    "outDir": "./dist",                                  /* Output compiled files to the 'dist' folder. */
+    "esModuleInterop": true,                             /* Allow compatibility between ES Modules and CommonJS. */
+    "forceConsistentCasingInFileNames": true,            /* Ensure consistent casing in file names. */
+    "skipLibCheck": true,                                /* Skip type checking of declaration files. */
+    "strict": true                                       /* Enable strict type checking options. */
+  },
+  "include": [
+    "src/**/*"                                           /* Include all TypeScript files in the src folder. */
+  ]
+}
