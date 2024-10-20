@@ -1,0 +1,31 @@
+CREATE TABLE package (
+	P_ID SERIAL PRIMARY KEY,
+	Name VARCHAR NOT NULL,
+	Github_Url VARCHAR NOT NULL
+);
+
+CREATE TABLE pack_version (
+	Version VARCHAR,
+	P_ID SERIAL,
+	Correctness numeric NOT NULL DEFAULT 0,
+	Responsiveness numeric NOT NULL DEFAULT 0,
+	Ramp_up numeric NOT NULL DEFAULT 0,
+	Bus_factor numeric NOT NULL DEFAULT 0,
+	License_metric numeric NOT NULL DEFAULT 0,
+	CONSTRAINT pk_package PRIMARY KEY (Version, P_ID),
+	CONSTRAINT fk_package FOREIGN KEY (P_ID)
+	REFERENCES package (P_ID)
+);
+
+
+
+INSERT INTO package (Name, Github_Url) VALUES ('shebl', 'www.sheblelshebl.com');
+INSERT INTO package (Name, Github_Url) VALUES ('lion', 'www.lionellion.com');
+INSERT INTO package (Name, Github_Url) VALUES ('cheetah', 'www.cheetahelcheetah.com');
+
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.0', '1', 0.5, 0.3, 0.2, 0.7, 1);    
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.5', '1', 0.4, 0.6, 0.2, 0.9, 1);
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.0', '2', 0.9, 0.1, 0.2, 0.7, 0.5);
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.7', '2', 0.8, 0.1, 0.2, 0.3, 0.5);
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.1', '3', 0.7, 0.6, 0.2, 0.4, 1);
+INSERT INTO pack_version (Version, P_ID, Correctness, Responsiveness, Ramp_up, Bus_factor, License_metric) VALUES ('1.1.8', '3', 0.3, 0.2, 0.1, 0.4, 0);

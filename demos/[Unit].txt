@@ -1,0 +1,23 @@
+[Unit]
+Description=Package Registry
+After=network.target multi-user.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/PackRegPh2
+ExecStart=/usr/bin/node /home/ubuntu/PackRegPh2/dist/index.js
+Restart=always
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/packreg.env
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=Pack_reg
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable packreg.service
+sudo systemctl start packreg.service

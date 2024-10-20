@@ -1,0 +1,26 @@
+rsync -avz -e "ssh -i ~/.ssh/NPM_server.pem" \
+. ubuntu@ec2-54-86-21-95.compute-1.amazonaws.com:~/PackRegPh2
+
+
+ssh -i "NPM_server.pem" ubuntu@ec2-54-86-21-95.compute-1.amazonaws.com
+
+"\\wsl.localhost\Ubuntu\home\zeyad\NPM_server.pem"
+
+rsync -avz --exclude 'node_modules' \
+-e "ssh -i ~/.ssh/NPM_server.pem" \
+. ubuntu@ec2-54-86-21-95.compute-1.amazonaws.com:~/PackRegPh2
+
+
+
+CREATE ROLE PackageRegDB_role WITH LOGIN PASSWORD 'datahead';
+GRANT ALL PRIVILEGES ON DATABASE "PackageRegDB" TO PackageRegDB_role;
+
+
+ psql 'postgresql://PackageRegDB_role:datahead@127.0.0.1/PackageRegDB'
+
+
+psql -h packregdbinstance.chcwgc2eouus.us-east-1.rds.amazonaws.com -U postgres -d PackRegDB
+
+
+sudo chmod 600 ~/PackRegPh2.env
+sudo chown ubuntu:ubuntu ~/PackRegPh2.env

@@ -1,36 +1,18 @@
 import pkg from 'pg';
+import dotenv from 'dotenv';
 const { Pool } = pkg;
 
+dotenv.config();
+
 const pool = new Pool({
-  host: 'localhost',
-  database: 'PackageRegDB',
-  user: 'postgres',
-  password: 'datahead',
-  port: 5433,
-  // ssl options if needed
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  port: parseInt(process.env.DB_PORT || '5432', 10),  // Parse the port from a string
+  ssl: {
+    rejectUnauthorized: false,  // RDS typically uses self-signed certificates, so you can ignore verification
+  },
 });
 
 export default pool;
-
-
-// Function to perform database operations
-// async function initDB() {
-//   try {
-//     // Execute a query
-//     const res = await pool.query('SELECT * FROM package');
-//     console.log(res.rows);
-//   } catch (err) {
-//     console.error('Error in fetching data', err);
-//   } finally {
-//     // Close the pool when you're done
-//     await pool.end();
-//     console.log('Database connection closed.');
-//   }
-// }
-
-// // Invoke the function
-// initDB().then(() => {
-//   console.log('Program completed.');
-// }).catch(err => {
-//   console.error('Unhandled error:', err);
-// });
