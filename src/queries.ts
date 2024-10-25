@@ -238,6 +238,9 @@ export const getPackageRatingQuery = (packageID: string) => {
       pack_version pv
     WHERE
       pv.p_id = $1
+    ORDER BY
+      pv.version DESC
+
   `;
   return pool.query(query, [packageID]);
 };
