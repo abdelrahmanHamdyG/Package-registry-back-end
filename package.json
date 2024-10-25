@@ -12,11 +12,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.675.0",
     "@types/express": "^5.0.0",
     "@types/pg": "^8.11.10",
+    "aws-sdk": "^2.1691.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "pg": "^8.13.0",
     "typescript": "^5.6.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17"
   }
 }

@@ -51,16 +51,15 @@ export const getPackageByNameQuery = (packageName: string) => {
 // Update package by ID
 export const updatePackageByIDQuery = (
   packageID: string,
-  name: string,
   github_url: string
 ) => {
   const query = `
     UPDATE package
-    SET name = $1, github_url = $2
-    WHERE p_id = $3
+    SET github_url = $1
+    WHERE p_id = $2
     RETURNING *
   `;
-  return pool.query(query, [name, github_url, packageID]);
+  return pool.query(query, [ github_url, packageID]);
 };
 
 // Update package version metrics
@@ -212,7 +211,7 @@ export const searchPackagesQuery = (packageQueries: any[], offset: number) => {
   };
   
   
-// Reset the registry (delete all packages and their versions)
+
 export const resetRegistryQuery = () => {
   const query = `
     TRUNCATE package CASCADE;
@@ -220,6 +219,8 @@ export const resetRegistryQuery = () => {
   `;
   return pool.query(query);
 };
+
+
 
 // Get package rating by package ID
 export const getPackageRatingQuery = (packageID: string) => {
