@@ -25,4 +25,4 @@ psql -h packregdbinstance.chcwgc2eouus.us-east-1.rds.amazonaws.com -U postgres -
 sudo chmod 600 ~/PackRegPh2.env
 sudo chown ubuntu:ubuntu ~/PackRegPh2.env
 
- sudo systemctl restart packreg.service
+sudo systemctl restart packreg.service
