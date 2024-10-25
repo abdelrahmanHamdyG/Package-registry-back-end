@@ -6,10 +6,10 @@ import {
   updatePackageByID,
   deletePackageByID,
   uploadPackage,
-  searchPackages,
+  //searchPackages,
   resetRegistry,
   getPackageRating,
-  searchPackagesByRegEx,
+  // searchPackagesByRegEx,
 } from "./controller.js";  // Ensure the correct path
 
 const router = Router();
@@ -20,12 +20,12 @@ router.get("", (req: Request, res: Response) => {
 });
 
 // POST /packages - Search packages by query
-router.post("/packages", searchPackages);
+//router.post("/packages", searchPackages);
 
 // DELETE /reset - Reset the registry
 router.delete("/reset", resetRegistry);
 
-// GET /package/:id - Get package by ID
+// GET /pckage/:id - Get package by ID
 router.get("/package/:id", getPackageByID);
 
 // GET /package/byName/:name - Get package by name
@@ -44,6 +44,6 @@ router.post("/package", uploadPackage);
 router.get("/package/:id/rate", getPackageRating);
 
 // POST /package/byRegEx - Search packages by regular expression
-router.post("/package/byRegEx", searchPackagesByRegEx);
+// router.post("/package/byRegEx", searchPackagesByRegEx);
 
 export default router;  // Export router for use in the app
