@@ -1,65 +1,68 @@
-import { S3Client, PutObjectCommand,GetObjectCommand } from "@aws-sdk/client-s3";
-import {Readable} from "stream"
-
-// AWS configuration (assumed to be in .env or environment variables)
-const bucketName = process.env.AWS_BUCKET_NAME;
-const region = process.env.AWS_BUCKET_REGION;
-const accessKeyID = process.env.AWS_ACCESS_KEY;
-const accessKeyPassword = process.env.AWS_SECRET_KEY;
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Readable } from "stream";
+import fs from "fs";
+import path from "path";
+import mime from "mime-types"; // Import mime-types for dynamic ContentType
 
 // Initialize the S3 client
 const s3Client = new S3Client({
-  region: region,
+  region: process.env.AWS_BUCKET_REGION,
   credentials: {
-    accessKeyId: accessKeyID!, // Your AWS access key
-    secretAccessKey: accessKeyPassword!, // Your AWS secret key
+    accessKeyId: process.env.AWS_ACCESS_KEY!,
+    secretAccessKey: process.env.AWS_SECRET_KEY!,
   },
 });
 
+// Stream helper function
 const streamToBuffer = (stream: Readable): Promise<Buffer> => {
-    return new Promise((resolve, reject) => {
-      const chunks: any[] = [];
-      stream.on("data", (chunk) => chunks.push(chunk));
-      stream.on("end", () => resolve(Buffer.concat(chunks)));
-      stream.on("error", reject);
-    });
-  };
-  
-  export const getFile = async (bucketName: string, key: string): Promise<Buffer> => {
-    try {
-      // Create the command to get the file
-      const command = new GetObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-      });
-  
-      // Send the command to S3
-      const response = await s3Client.send(command);
-  
-      // The Body is a stream, so convert it to a buffer
-      const fileBuffer = await streamToBuffer(response.Body as Readable);
-      return fileBuffer;
-    } catch (err) {
-      console.error("Error getting file from S3:", err);
-      throw err;
-    }
-  };
-  
-export const UploadFileToS3 = async (fileKey: string, fileContent: string) => {
-  
-    // Create the text file content as a buffer
-    console.log("we are uploadin the file ")
-    const fileBody = Buffer.from(fileContent, 'utf-8');
-
-    // Create the upload parameters
-    const uploadParams = {
-      Bucket: bucketName,  // The S3 bucket name
-      Key: fileKey,        // The file name in the S3 bucket
-      Body: fileBody,      // The file content (as buffer)
-      ContentType: 'text/plain', // Specify the file type as plain text
-    };
-
-    // Upload the file to S3
-    const command = new PutObjectCommand(uploadParams);
-    await  s3Client.send(command);
+  return new Promise((resolve, reject) => {
+    const chunks: any[] = [];
+    stream.on("data", (chunk) => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
+  });
 };
+
+export const getFile = async (bucketName: string, key: string): Promise<Buffer> => {
+  try {
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+    const response = await s3Client.send(command);
+    return streamToBuffer(response.Body as Readable);
+  } catch (err) {
+    console.error("Error getting file from S3:", err);
+    throw err;
+  }
+};
+
+export const UploadFileToS3 = async (fileKey: string, filePath: string) => {
+  console.log("Uploading file to S3");
+  const fileStream = fs.createReadStream(filePath);
+
+  // Dynamically set ContentType based on file extension
+  const contentType = mime.lookup(filePath) || "application/octet-stream";
+
+  const uploadParams = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: fileKey,
+    Body: fileStream,
+    ContentType: contentType,
+  };
+
+  const command = new PutObjectCommand(uploadParams);
+  await s3Client.send(command);
+};
+
+export async function uploadDirectoryToS3(directoryPath: string, s3PathPrefix: string) {
+  const items = fs.readdirSync(directoryPath, { withFileTypes: true });
+
+  for (const item of items) {
+    const fullPath = path.join(directoryPath, item.name);
+    const s3Key = path.join(s3PathPrefix, item.name);
+
+    if (item.isDirectory()) {
+      await uploadDirectoryToS3(fullPath, s3Key);
+    } else {
+      await UploadFileToS3(s3Key, fullPath);
+    }
+  }
+}

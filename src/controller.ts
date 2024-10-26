@@ -1,5 +1,9 @@
 // controller.ts
 import { Request, Response } from 'express';
+import http from "isomorphic-git/http/node/index.js";
+import * as git from 'isomorphic-git'
+import fs from 'fs'
+import archiver from "archiver"; // Import archiver for zipping
 import pool from './db.js'; // Adjust the path according to your project structure
 import {
   getPackageByIDQuery,
@@ -17,7 +21,7 @@ import {
 } from './queries.js';
 
 import { Logger } from './logger.js';
-import { UploadFileToS3, getFile } from './s3.js';
+import { UploadFileToS3, getFile, uploadDirectoryToS3 } from './s3.js';
 
 // Initialize the logger
 const logger = new Logger();
@@ -184,6 +188,50 @@ export const deletePackageByID = async (req: Request, res: Response) => {
   }
 };
 
+// const zipDirectory = async (source: string, out: string) => {
+//   logger.log("we started zipping");
+
+//   // Check if the source directory exists and list its contents
+//   if (!fs.existsSync(source)) {
+//     logger.log(`Source directory ${source} does not exist`);
+//     return;
+//   }
+
+//   const files = fs.readdirSync(source);
+//   if (files.length === 0) {
+//     logger.log(`Source directory ${source} is empty`);
+//     return;
+//   }
+
+//   logger.log(`Contents of ${source}: ${files.join(', ')}`);
+
+//   const archive = archiver('zip', { zlib: { level: 2 } });
+//   const stream = fs.createWriteStream(out);
+//   logger.log("we are here");
+
+//   return new Promise<void>((resolve, reject) => {
+//     archive
+//       .directory(source, false) // Add the directory to the archive
+//       .on('error', (err) => {
+//         logger.log(`Error during zipping: ${err}`);
+//         reject(err);
+//       })
+//       .pipe(stream);
+
+//     stream.on('close', () => {
+//       logger.log("everything is ok, zipping finalized");
+//       resolve();
+//     });
+
+//     stream.on('error', (err) => {
+//       logger.log(`Error writing zip file: ${err}`);
+//       reject(err);
+//     });
+
+//     archive.finalize(); // Finalize the archive
+//   });
+// };
+
 // Upload new package
 export const uploadPackage = async (req: Request, res: Response) => {
   const {
@@ -219,11 +267,11 @@ export const uploadPackage = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     logger.log('Transaction started for uploading package');
-
+  
     const packageResult = await insertPackageQuery(client, name, github_url);
     const packageID = packageResult.rows[0].p_id;
     logger.log(`Inserted package with ID: ${packageID}`);
-
+  
     const versionResult = await insertPackageVersionQuery(
       client,
       version,
@@ -235,16 +283,61 @@ export const uploadPackage = async (req: Request, res: Response) => {
       license_metric
     );
     logger.log(`Inserted package version: ${version} for package ID: ${packageID}`);
+  
+    await fs.promises.mkdir('./toBeUploaded', { recursive: true });
+    logger.log("Directory created successfully");
+  
+    // Attempt git clone with specific error handling
+    try {
+      await git.clone({
+        fs,
+        http,
+        dir: './toBeUploaded',
+        url: github_url,
+        singleBranch: true,
+        depth: 1
+      });
+      logger.log("Repository cloned successfully");
+    } catch (cloneError) {
+      if (cloneError instanceof Error) {
+        logger.logError(`Git clone failed: ${cloneError.message}`);
+        logger.logError(`Git clone stack trace: ${cloneError.stack}`);
+      } else {
+        logger.logError("Git clone failed with an unknown error");
+      }
+      throw new Error("Git clone operation aborted");
+    }
+    
+    // Attempt zipping with specific error handling
+    // try {
+    //   await zipDirectory("./toBeUploaded/", `./toBeUploaded/${packageID}-${version}.zip`);
+    //   logger.log("File zipped successfully");
+    // } catch (zipError) {
+    //   if(zipError  instanceof Error)
+    //     logger.logError(`Zipping failed: ${zipError.message}`);
+    //   throw new Error("Zipping operation aborted");
+    // }
+  
+    // Attempt S3 upload with specific error handling
+    try {
+      await uploadDirectoryToS3(
+        `./toBeUploaded`,
+        `./toBeUploaded/${packageID}-${version}`
+      );
+      logger.log("File uploaded to S3 successfully");
+      
+    } catch (s3Error) {
+      if(s3Error instanceof Error)
+        logger.logError(`S3 upload failed: ${s3Error.message}`);
+      throw new Error("S3 upload operation aborted");
+    }
 
-    await UploadFileToS3(
-      `${packageID}-${version}`,
-      `how are you my friends I am applying with name ${name}`
-    );
-    logger.log(`Uploaded file to S3 for package ID: ${packageID} and version: ${version}`);
+    
+    fs.rmSync('./toBeUploaded', { recursive: true, force: true });
 
     await client.query('COMMIT');
     logger.log('Transaction committed for uploading package');
-
+  
     res.status(201).json({
       ...packageResult.rows[0],
       versions: [versionResult.rows[0]],
@@ -252,28 +345,14 @@ export const uploadPackage = async (req: Request, res: Response) => {
     logger.log(`Successfully uploaded package with ID: ${packageID}`);
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error uploading new package:', error);
-    logger.logError(`Error uploading new package: ${error}`);
+    
+    if(error instanceof Error)
+      logger.log(`Error uploading new package: ${error.message}\n${error.stack}`);
     res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     client.release();
   }
-};
-
-// Reset registry
-export const resetRegistry = (req: Request, res: Response) => {
-  logger.log('Received request to reset registry');
-
-  resetRegistryQuery()
-    .then(() => {
-      res.status(200).json({ message: 'Registry has been reset.' });
-      logger.log('Registry has been reset successfully');
-    })
-    .catch((error) => {
-      console.error('Error resetting registry:', error);
-      logger.logError(`Error resetting registry: ${error}`);
-      res.status(500).json({ error: 'Internal Server Error' });
-    });
+  
 };
 
 // Get package rating
@@ -290,6 +369,7 @@ export const getPackageRating = async (req: Request, res: Response) => {
 
   try {
     const all_metrics = await getPackageRatingQuery(packageID);
+
 
     if (!all_metrics.rows.length) {
       res.status(404).json({ error: 'Package not found' });

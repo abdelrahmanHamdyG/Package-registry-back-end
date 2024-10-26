@@ -7,7 +7,7 @@ import {
   deletePackageByID,
   uploadPackage,
   //searchPackages,
-  resetRegistry,
+  // resetRegistry,
   getPackageRating,
   // searchPackagesByRegEx,
 } from "./controller.js";  // Ensure the correct path
@@ -23,7 +23,7 @@ router.get("", (req: Request, res: Response) => {
 //router.post("/packages", searchPackages);
 
 // DELETE /reset - Reset the registry
-router.delete("/reset", resetRegistry);
+// router.delete("/reset", resetRegistry);
 
 // GET /pckage/:id - Get package by ID
 router.get("/package/:id", getPackageByID);
