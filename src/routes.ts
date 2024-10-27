@@ -19,7 +19,11 @@ router.delete("/reset", resetRegistry);
 router.get("/package/:id", getPackageByID);
 
 // // PUT /package/:id - Update package by ID
+
+
+router.post("/package/byRegEx", searchPackageByRegex);
 router.post("/package/:id", updatePackage);
+
 
 // // DELETE /package/:id - Delete package by ID
 // router.delete("/package/:id", deletePackageByID);
@@ -31,6 +35,6 @@ router.post("/package", uploadPackage);
 // router.get("/package/:id/rate", getPackageRating);
 
 // POST /package/byRegEx - Search packages by regular expression
- router.post("/package/byRegEx", searchPackageByRegex);
+ 
 
 export default router;  // Export router for use in the app

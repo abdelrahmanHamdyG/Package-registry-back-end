@@ -18,12 +18,11 @@ import {
   getNameVersionById, // New
 } from './queries.js';
 
-import { Logger } from './logger.js';
-import { downloadFromS3, getFile, uploadBase64ToS3, uploadDirectoryToS3, uploadZipToS3 } from './s3.js';
-import { JsxEmit } from 'typescript';
+
+import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
+
 
 // Initialize the logger
-const logger = new Logger();
 
 const zipDirectory = async (source: string, out: string) => {
   const archive = archiver('zip', { zlib: { level: 2 } });
@@ -124,121 +123,127 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-export const uploadPackage = async (req: Request, res: Response) => {
-  const { Name, Content, JSProgram, debloat, URL } = req.body;
+  export const uploadPackage = async (req: Request, res: Response) => {
+    const { Name, Content, JSProgram, debloat, URL } = req.body;
+    console.log(`Name is ${Name}`)
+    console.log(`Content is ${Content}`)
+    console.log(`JSPrgogg ${JSProgram}`)
+    console.log(`debloat ${debloat}`)
+    console.log(`URL ${URL}`)
 
-  if ((!Content && !URL) || (Content && URL)) {
-    res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-    console.error("Error: Invalid format of Content and URL");
-    return;
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN');
-
-    const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
-    const id:number = packageMetaData.rows[0].id;
-    const key = `packages/${id}.zip`; // Example key path
-    console.log(`id is ${id}`);
-    if (Content) {
-      
-      
-
-      
-      await uploadBase64ToS3(Content,  key);
-
-      
-      await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
-      await insertPackageRating(client,id);
-      
-      res.status(201).json({
-        
-        metadata:{
-          Name:Name,
-          Version:"1.0.0",
-          ID:id
-        },
-        data:{
-          Content:Content,
-          JSProgram:JSProgram
-        }
-      });
-      console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
-      
-      await client.query('COMMIT');
-    } else {
-      // Handle cases where URL is used for ingestion instead of Content
-
-      console.log("we are cloning ")
-      const tempDir = path.join(os.tmpdir(), `repo-${id}`);
-      fs.mkdirSync(tempDir, { recursive: true });
-
-     await  git.clone({
-          fs,
-          http,
-          dir:tempDir,
-          url: URL,
-          singleBranch: true,
-          depth: 1,
-
-      })
-      console.log("we cloned successfully")
-      const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
-      await zipDirectory(tempDir, zipPath);
-      console.log(`Zipped repository to ${zipPath}`);
-      const fileStream = fs.createReadStream(zipPath);
-      uploadZipToS3(key,fileStream,'application/zip')
-
-
-      const zipFileContent = fs.readFileSync(zipPath);
-      const base64Content = zipFileContent.toString('base64');
-
-      await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
-      await insertPackageRating(client, id);
-
-
-      res.status(201).json({
-        
-        metadata:{
-          Name:Name,
-          Version:"1.0.0",
-          ID:id
-        },
-        data:{
-          Content:base64Content,
-          JSProgram:JSProgram
-        }
-      });
-
-      await client.query('COMMIT');
-      if (fs.existsSync(tempDir)) {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      }
-      if (fs.existsSync(zipPath)) {
-        fs.rmSync(zipPath);
-      }
-
+    if ((!Content && !URL) || (Content && URL)) {
+      res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
+      console.error("Error: Invalid format of Content and URL");
+      return;
     }
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error in uploading package:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  } finally {
-    client.release();
-    
-  }
-};
+
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
+      const id:number = packageMetaData.rows[0].id;
+      const key = `packages/${id}.zip`; // Example key path
+      console.log(`id is ${id}`);
+      if (Content) {
+        
+        
+
+        
+        await uploadBase64ToS3(Content,  key);
+
+        
+        await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
+        await insertPackageRating(client,id);
+        
+        res.status(201).json({
+          
+          metadata:{
+            Name:Name,
+            Version:"1.0.0",
+            ID:id
+          },
+          data:{
+            Content:Content,
+            JSProgram:JSProgram
+          }
+        });
+        console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
+        
+        await client.query('COMMIT');
+      } else {
+        // Handle cases where URL is used for ingestion instead of Content
+
+        console.log("we are cloning ")
+        const tempDir = path.join(os.tmpdir(), `repo-${id}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+
+      await  git.clone({
+            fs,
+            http,
+            dir:tempDir,
+            url: URL,
+            singleBranch: true,
+            depth: 1,
+        })
+        console.log("we cloned successfully")
+        const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
+        await zipDirectory(tempDir, zipPath);
+        console.log(`Zipped repository to ${zipPath}`);
+        const fileStream = fs.createReadStream(zipPath);
+        uploadZipToS3(key,fileStream,'application/zip')
+
+
+        const zipFileContent = fs.readFileSync(zipPath);
+        const base64Content = zipFileContent.toString('base64');
+
+        await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
+        await insertPackageRating(client, id);
+
+
+        res.status(201).json({
+          
+          metadata:{
+            Name:Name,
+            Version:"1.0.0",
+            ID:id
+          },
+          data:{
+            Content:base64Content,
+            JSProgram:JSProgram
+          }
+        });
+
+        await client.query('COMMIT');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        if (fs.existsSync(zipPath)) {
+          fs.rmSync(zipPath);
+        }
+
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error in uploading package:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+      client.release();
+      
+    }
+  };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
 
-  const id = req.params.id as unknown as number;
+  const id =req.params.id  as unknown as number 
   console.log(`id from get Package by id is ${id}`);
 
   const client = await pool.connect();
   try {
+    console.log("we are inside try")
     await client.query("BEGIN");
+    console.log("after beging")
 
     const package_data = await getPackageByIDQuery(client, id);
 
@@ -453,6 +458,9 @@ export const updatePackage = async (req: Request, res: Response) => {
     }
   }
 };
+
+
+
 
 // Get package by name
 // export const getPackageByName = async (req: Request, res: Response) => {

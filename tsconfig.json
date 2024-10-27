@@ -10,6 +10,8 @@
     "strict": true                                       /* Enable strict type checking options. */
   },
   "include": [
-    "src/**/*"                                           /* Include all TypeScript files in the src folder. */
-  ]
+    "src/**/*.ts"                                           /* Include all TypeScript files in the src folder. */
+  ],
+  "exclude": ["node_modules", "dist", "test"]
+
 }
