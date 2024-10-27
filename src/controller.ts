@@ -24,7 +24,7 @@ import {
 } from './queries.js';
 
 import { Logger } from './logger.js';
-import { getFile, uploadBase64ToS3, uploadDirectoryToS3, uploadZipToS3 } from './s3.js';
+import { downloadFromS3, getFile, uploadBase64ToS3, uploadDirectoryToS3, uploadZipToS3 } from './s3.js';
 
 // Initialize the logger
 const logger = new Logger();
@@ -44,7 +44,90 @@ const zipDirectory = async (source: string, out: string) => {
   });
 };
 
+export const resetRegistry = async (req: Request, res: Response) => {
+  const isAdmin:Boolean=true;
+  if (!isAdmin) {
+    res.status(401).json({ error: "You do not have permission to reset the registry."});
+    console.error("not an admin");
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await resetRegistryQuery(client);
+    res.status(200).json({message:'Registry is reset'});
+  }
+  catch (error) {
+    console.error('Error in reseting the registry:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  } finally {
+    client.release();      
+  }
+};
 
+export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
+  const queries: Array<{ Name: string; Version: string }> = req.body;
+  const offset: number = parseInt(req.query.offset as string) || 0;
+  let packages: any[] = [];
+
+  let queryText = 'SELECT * FROM package WHERE';
+  const queryParams: (string | number)[] = [];
+  const conditions: string[] = [];
+
+  try {
+    for (let i = 0; i < queries.length; i++) {
+      const { Name, Version } = queries[i];
+
+      if (Name === '*') {
+        conditions.push('TRUE'); // Matches all packages
+      } else {
+        let condition = `(name = $${queryParams.length + 1}`;
+        queryParams.push(Name);
+
+        if (Version[0] === '~') {
+          const [major, minor] = Version.substring(1).split('.').map(Number);
+          condition += ` AND version >= $${queryParams.length + 1} AND version < $${queryParams.length + 2}`;
+          queryParams.push(`${major}.${minor}.0`, `${major}.${minor + 1}.0`);
+        } else if (Version[0] === '^') {
+          const [major] = Version.substring(1).split('.').map(Number);
+          condition += ` AND version >= $${queryParams.length + 1} AND version < $${queryParams.length + 2}`;
+          queryParams.push(`${major}.0.0`, `${major + 1}.0.0`);
+        } else if (Version.includes('-')) {
+          const [startVersion, endVersion] = Version.split('-').map(v => v.trim());
+          condition += ` AND version >= $${queryParams.length + 1} AND version <= $${queryParams.length + 2}`;
+          queryParams.push(startVersion, endVersion);
+        } else {
+          condition += ` AND version = $${queryParams.length + 1}`;
+          queryParams.push(Version);
+        }
+
+        condition += ')';
+        conditions.push(condition);
+      }
+    }
+
+    // Combine conditions with OR
+    queryText += ` ${conditions.join(' OR ')}`;
+
+    // Add pagination with OFFSET and LIMIT for each page (let's set limit to 10 as an example)
+    const limit = 10;
+    queryText += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
+
+    console.log(`The query is: ${queryText}`);
+    console.log(`Query parameters: ${queryParams}`);
+
+    // Execute the combined query
+    const result = await pool.query(queryText, queryParams);
+    packages = result.rows;
+
+    // Return response with packages and offset in headers
+    res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
+    res.status(200).json({ packages });
+  } catch (error) {
+    console.error('Error executing query', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 export const uploadPackage = async (req: Request, res: Response) => {
   const { Name, Content, JSProgram, debloat, URL } = req.body;
 
@@ -71,7 +154,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       await uploadBase64ToS3(Content,  key);
 
       
-      await insertIntoPackageData(client, id, Content, JSProgram, debloat, URL);
+      await insertIntoPackageData(client, id, '', JSProgram, debloat, URL);
       await insertPackageRating(client,id);
       
       res.status(201).json({
@@ -116,7 +199,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       const zipFileContent = fs.readFileSync(zipPath);
       const base64Content = zipFileContent.toString('base64');
 
-      await insertIntoPackageData(client, id, base64Content, JSProgram, debloat, URL);
+      await insertIntoPackageData(client, id, '', JSProgram, debloat, URL);
       await insertPackageRating(client, id);
 
 
@@ -152,6 +235,101 @@ export const uploadPackage = async (req: Request, res: Response) => {
   }
 };
 
+export const getPackageByID = async (req: Request, res: Response)=> {
+
+  const id = req.params.id as unknown as number;
+  console.log(`id from get Package by id is ${id}`);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const package_data = await getPackageByIDQuery(client, id);
+
+    if (package_data.rows.length === 0) {
+      console.error("Package doesn't exist");
+      await client.query("ROLLBACK");
+       res.status(404).json({ error: "Package doesn't exist" });
+       return;
+    }
+
+    const current_data = package_data.rows[0];
+
+    // Read from S3
+    const key = `packages/${id}.zip`;
+    const zipFileContent = await downloadFromS3(key);
+    console.log(`Downloaded package from S3 for id: ${id}`);
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      metadata: {
+        Name: current_data.name,
+        Version: current_data.version,
+        ID: current_data.id,
+      },
+      data: {
+        Content: zipFileContent.toString('base64'),
+        JSProgram: current_data.js_program,
+        debloat: current_data.debloat,
+        URL: current_data.url,
+      },
+    });
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error('Error in getting package by ID:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  } finally {
+    client.release();
+  }
+};
+
+export const searchPackageByRegex = async (req: Request, res: Response) => {
+  const { RegEx } = req.body;
+
+  if (!RegEx) {
+    res.status(400).json({ error: "There is missing field(s) in the PackageRegEx or it is formed improperly, or is invalid"});
+    console.error("Error: There is no Regex");
+    return;
+  }
+  const client = await pool.connect();
+  try {
+
+
+    const packageMetaData = await searchPackagesByRegExQuery(client,RegEx);
+
+    if(packageMetaData.rows.length===0){
+      res.status(404).json({error: "No package found under this regex"});
+      console.error("Error: There is no package for that Regex");
+      return; 
+    }
+
+    const metadataList=[]
+    for (let i=0;i<packageMetaData.rows.length;i++){
+    
+    const packId:number = packageMetaData.rows[i].id;
+    const packName:string=packageMetaData.rows[i].name;
+    const packVersion:string=packageMetaData.rows[i].version;
+    
+      metadataList.push({
+        metadata:{
+          Name:packName,
+          Version:packVersion,
+          ID:packId
+        }
+      });
+    }
+    res.status(200).json(metadataList)
+    
+  }
+  catch (error) {
+    console.error('Error in searching by Regex:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  } finally {
+    client.release();      
+  }
+};
 
 
 // Get package by name

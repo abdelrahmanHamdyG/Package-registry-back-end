@@ -14,12 +14,27 @@ const s3Client = new S3Client({
 });
 
 // Stream helper function
+export const downloadFromS3 = async (key: string): Promise<Buffer> => {
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME!,
+    Key: key,
+  };
+
+  try {
+    const data = await s3Client.send(new GetObjectCommand(params));
+    return await streamToBuffer(data.Body as Readable);
+  } catch (error) {
+    console.error('Error downloading from S3:', error);
+    throw error;
+  }
+};
+
 const streamToBuffer = (stream: Readable): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const chunks: any[] = [];
-    stream.on("data", (chunk) => chunks.push(chunk));
-    stream.on("end", () => resolve(Buffer.concat(chunks)));
-    stream.on("error", reject);
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', (err) => reject(err));
   });
 };
 

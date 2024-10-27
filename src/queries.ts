@@ -1,29 +1,29 @@
 // queries.ts
-import { PoolClient } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import pool from './db.js'; // Adjust the path according to your project structure
 import { Double } from 'aws-sdk/clients/apigateway.js';
 
 // Get package by ID
-export const getPackageByIDQuery = (packageID: string) => {
+export const getPackageByIDQuery = (client:PoolClient, packageID: number) => {
   const query = `
-    SELECT
-      p.p_id,
-      p.name,
-      p.github_url,
-      pv.version,
-      pv.correctness,
-      pv.responsiveness,
-      pv.ramp_up,
-      pv.bus_factor,
-      pv.license_metric
-    FROM
-      package p
-    LEFT JOIN
-      pack_version pv ON p.p_id = pv.p_id
-    WHERE
-      p.p_id = $1
+    SELECT 
+    p.id,
+    p.name,
+    p.version,
+    pd.debloat,
+    pd.js_program,
+    pd.url
+FROM 
+    package p
+JOIN 
+    package_data pd
+ON 
+    p.id = pd.package_id
+WHERE 
+    p.id = $1;
+
   `;
-  return pool.query(query, [packageID]);
+  return client.query(query, [packageID]);
 };
 
 // Get package by Name
@@ -209,15 +209,12 @@ export const searchPackagesQuery = (packageQueries: any[], offset: number) => {
   
   
 
-export const resetRegistryQuery = () => {
-  const query = `
-    TRUNCATE package CASCADE;
-    TRUNCATE pack_version CASCADE;
-  `;
-  return pool.query(query);
-};
-
-
+  export const resetRegistryQuery = (client:PoolClient) => {
+    const query = `
+      TRUNCATE package CASCADE;
+    `;
+    return client.query(query);
+  };
 
 // Get package rating by package ID
 export const getPackageRatingQuery = (packageID: string) => {
@@ -243,28 +240,15 @@ export const getPackageRatingQuery = (packageID: string) => {
 };
 
 // Search packages by regular expression
-export const searchPackagesByRegExQuery = (regex: string) => {
+export const searchPackagesByRegExQuery = (client:PoolClient,regex: string) => {
   const query = `
     SELECT
-      p.p_id,
-      p.name,
-      p.github_url,
-      pv.version,
-      pv.correctness,
-      pv.responsiveness,
-      pv.ramp_up,
-      pv.bus_factor,
-      pv.license_metric
-    FROM
-      package p
-    LEFT JOIN
-      pack_version pv ON p.p_id = pv.p_id
+     id, name, version from package 
     WHERE
-      p.name ~* $1 
+     name ~* $1 
   `;
-  return pool.query(query, [regex]);
+  return client.query(query, [regex]);
 };
-
 
 export const insertPackageRating = (
   client:PoolClient,
@@ -311,4 +295,13 @@ export const insertPackageRating = (
   ];
 
   return client.query(query, values);
+};
+
+
+export const getCompatibleVersion = (Name:string,Version:number) => {
+  const query = `
+    SELECT * FROM package
+    where 
+  `;
+  return pool.query(query);
 };
