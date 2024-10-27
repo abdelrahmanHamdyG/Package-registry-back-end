@@ -1,0 +1,38 @@
+name: CD to EC2
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH agent
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+    - name: Sync files to EC2 using rsync
+      run: |
+        rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/PackReg2
+
+    - name: Run deployment script on EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd ~/PackReg2
+          # Install dependencies
+          npm install
+          # Compile TypeScript files
+          npm run build
+          # Restart the application or start if not already running
+          pm2 restart app || pm2 start dist/index.js --name "app"
+        EOF
