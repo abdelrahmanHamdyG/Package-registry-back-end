@@ -1,6 +1,7 @@
 // queries.ts
 import { PoolClient } from 'pg';
 import pool from './db.js'; // Adjust the path according to your project structure
+import { Double } from 'aws-sdk/clients/apigateway.js';
 
 // Get package by ID
 export const getPackageByIDQuery = (packageID: string) => {
@@ -111,40 +112,36 @@ export const deletePackageByIDQuery = (
 export const insertPackageQuery = (
   client: PoolClient,
   name: string,
-  github_url: string
+  version: string
 ) => {
   const query = `
-    INSERT INTO package (name, github_url)
+    INSERT INTO package (name, version)
     VALUES ($1, $2)
     RETURNING *
   `;
-  return client.query(query, [name, github_url]);
+  return client.query(query, [name, version]);
 };
 
 // Insert package version
-export const insertPackageVersionQuery = (
+export const insertIntoPackageData = (
   client: PoolClient,
-  version: string,
-  packageID: string,
-  correctness: number,
-  responsiveness: number,
-  ramp_up: number,
-  bus_factor: number,
-  license_metric: number
+  package_id: number,
+  content:string,
+  url:string,
+  debloat:Boolean,
+  js_program:string
 ) => {
   const query = `
-    INSERT INTO pack_version (version, p_id, correctness, responsiveness, ramp_up, bus_factor, license_metric)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO package_data (package_id, content, url, debloat, js_program)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING *
   `;
   return client.query(query, [
-    version,
-    packageID,
-    correctness,
-    responsiveness,
-    ramp_up,
-    bus_factor,
-    license_metric,
+    package_id,
+    content,
+    url,
+    debloat,
+    js_program,
   ]);
 };
 
@@ -266,4 +263,52 @@ export const searchPackagesByRegExQuery = (regex: string) => {
       p.name ~* $1 
   `;
   return pool.query(query, [regex]);
+};
+
+
+export const insertPackageRating = (
+  client:PoolClient,
+  packageID: number,
+  correctness: number = -1,
+  responsiveness: number = -1,
+  ramp_up: number = -1,
+  bus_factor: number = -1,
+  license_metric: number = -1,
+  pinning: number = -1,
+  pull_request: number = -1,
+  correctness_latency: number = -1,
+  responsiveness_latency: number = -1,
+  ramp_up_latency: number = -1,
+  bus_factor_latency: number = -1,
+  license_metric_latency: number = -1,
+  pinning_latency: number = -1,
+  pull_request_latency: number = -1,
+  net_score: number = -1,
+  net_score_latency: number = -1
+) => {
+  const query = `
+    INSERT INTO package_rating (
+      package_id, bus_factor, correctness, ramp_up, responsive_maintainer, license_score, 
+      good_pinning_practice, pull_request, net_score, bus_factor_latency, 
+      correctness_latency, ramp_up_latency, responsive_maintainer_latency, 
+      license_score_latency, good_pinning_practice_latency, pull_request_latency, 
+      net_score_latency
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, 
+      $7, $8, $9, $10, 
+      $11, $12, $13, 
+      $14, $15, $16, 
+      $17
+    )
+  `;
+
+  const values = [
+    packageID, bus_factor, correctness, ramp_up, responsiveness, license_metric, 
+    pinning, pull_request, net_score, bus_factor_latency, 
+    correctness_latency, ramp_up_latency, responsiveness_latency, 
+    license_metric_latency, pinning_latency, pull_request_latency, 
+    net_score_latency
+  ];
+
+  return client.query(query, values);
 };

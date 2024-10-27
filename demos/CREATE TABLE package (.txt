@@ -1,22 +1,67 @@
 CREATE TABLE package (
-	P_ID SERIAL PRIMARY KEY,
-	Name VARCHAR NOT NULL,
-	Github_Url VARCHAR NOT NULL
+    id SERIAL PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    version VARCHAR NOT NULL,
+    UNIQUE(name, version)
 );
 
-CREATE TABLE pack_version (
-	Version VARCHAR,
-	P_ID SERIAL,
-	Correctness numeric NOT NULL DEFAULT 0,
-	Responsiveness numeric NOT NULL DEFAULT 0,
-	Ramp_up numeric NOT NULL DEFAULT 0,
-	Bus_factor numeric NOT NULL DEFAULT 0,
-	License_metric numeric NOT NULL DEFAULT 0,
-	CONSTRAINT pk_package PRIMARY KEY (Version, P_ID),
-	CONSTRAINT fk_package FOREIGN KEY (P_ID)
-	REFERENCES package (P_ID)
+CREATE TABLE package_data (
+    package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    content TEXT,
+    url VARCHAR,
+    debloat BOOLEAN,
+    js_program TEXT,
+    CONSTRAINT package_data_content_or_url CHECK ((content IS NOT NULL) OR (url IS NOT NULL))
 );
 
+CREATE TABLE user_account (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR NOT NULL UNIQUE,
+    is_admin BOOLEAN NOT NULL
+);
+
+CREATE TABLE package_cost (
+    package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    standalone_cost NUMERIC NOT NULL,
+    total_cost NUMERIC NOT NULL,
+    PRIMARY KEY(package_id)
+);
+
+CREATE TABLE package_dependencies (
+    package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    dependency_package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    PRIMARY KEY(package_id, dependency_package_id)
+);
+
+CREATE TABLE package_rating (
+    package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    bus_factor NUMERIC DEFAULT -1,
+    correctness NUMERIC DEFAULT -1,
+    ramp_up NUMERIC DEFAULT -1,
+    responsive_maintainer NUMERIC DEFAULT -1,
+    license_score NUMERIC DEFAULT -1,
+    good_pinning_practice NUMERIC DEFAULT -1,
+    pull_request NUMERIC DEFAULT -1,
+    net_score NUMERIC DEFAULT -1,
+    bus_factor_latency NUMERIC DEFAULT -1,
+    correctness_latency NUMERIC DEFAULT -1,
+    ramp_up_latency NUMERIC DEFAULT -1,
+    responsive_maintainer_latency NUMERIC DEFAULT -1,
+    license_score_latency NUMERIC DEFAULT -1,
+    good_pinning_practice_latency NUMERIC DEFAULT -1,
+    pull_request_latency NUMERIC DEFAULT -1,
+    net_score_latency NUMERIC DEFAULT -1,
+    PRIMARY KEY(package_id)
+);
+
+
+CREATE TABLE package_history (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER REFERENCES package(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES user_account(id),
+    action VARCHAR CHECK (action IN ('CREATE', 'UPDATE', 'DOWNLOAD', 'RATE')),
+    action_date TIMESTAMP DEFAULT NOW()
+);
 
 
 INSERT INTO package (Name, Github_Url) VALUES ('shebl', 'www.sheblelshebl.com');

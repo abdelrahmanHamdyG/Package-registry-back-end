@@ -1,16 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import {
-  getPackageByID,
-  getPackageByName,
-  updatePackageByID,
-  deletePackageByID,
-  uploadPackage,
-  //searchPackages,
-  // resetRegistry,
-  getPackageRating,
-  // searchPackagesByRegEx,
-} from "./controller.js";  // Ensure the correct path
+import { uploadPackage } from "./controller.js";  // Ensure the correct path
 
 const router = Router();
 
@@ -26,22 +16,22 @@ router.get("", (req: Request, res: Response) => {
 // router.delete("/reset", resetRegistry);
 
 // GET /pckage/:id - Get package by ID
-router.get("/package/:id", getPackageByID);
+// router.get("/package/:id", getPackageByID);
 
-// GET /package/byName/:name - Get package by name
-router.get("/package/byName/:name", getPackageByName);
+// // GET /package/byName/:name - Get package by name
+// router.get("/package/byName/:name", getPackageByName);
 
-// PUT /package/:id - Update package by ID
-router.put("/package/:id", updatePackageByID);
+// // PUT /package/:id - Update package by ID
+// router.put("/package/:id", updatePackageByID);
 
-// DELETE /package/:id - Delete package by ID
-router.delete("/package/:id", deletePackageByID);
+// // DELETE /package/:id - Delete package by ID
+// router.delete("/package/:id", deletePackageByID);
 
 // POST /package - Upload new package
 router.post("/package", uploadPackage);
 
 // GET /package/:id/rate - Get package rating by ID
-router.get("/package/:id/rate", getPackageRating);
+// router.get("/package/:id/rate", getPackageRating);
 
 // POST /package/byRegEx - Search packages by regular expression
 // router.post("/package/byRegEx", searchPackagesByRegEx);

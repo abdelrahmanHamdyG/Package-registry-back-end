@@ -23,6 +23,31 @@ const streamToBuffer = (stream: Readable): Promise<Buffer> => {
   });
 };
 
+export const uploadZipToS3 = async (
+  key: string,
+  fileStream: fs.ReadStream,
+  contentType: string
+) => {
+  const s3Params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: fileStream,
+    ContentType: contentType,
+  };
+
+  try {
+    const result = await s3Client.send(new PutObjectCommand(s3Params));
+    console.log(`File uploaded successfully:`, result);
+    return result;
+  } catch (error) {
+    console.error('Error uploading to S3:', error);
+    throw error;
+  }
+};
+
+
+
+
 export const getFile = async (bucketName: string, key: string): Promise<Buffer> => {
   try {
     const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
@@ -65,4 +90,28 @@ export async function uploadDirectoryToS3(directoryPath: string, s3PathPrefix: s
       await UploadFileToS3(s3Key, fullPath);
     }
   }
+
 }
+
+export async function uploadBase64ToS3(base64Content:string, key:string) {
+  try {
+    // Decode the Base64 content to a binary buffer
+    const fileBuffer = Buffer.from(base64Content, 'base64');
+
+    // Set up the parameters for S3
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: 'application/zip',
+    };
+
+    // Upload the file
+    const data = await s3Client.send(new PutObjectCommand(uploadParams));
+    console.log('File uploaded successfully:', data);
+  } catch (error) {
+    console.error('Error uploading file:', error);
+  }
+}
+
+
