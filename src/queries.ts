@@ -1,7 +1,7 @@
 // queries.ts
 import { Pool, PoolClient } from 'pg';
 import pool from './db.js'; // Adjust the path according to your project structure
-import { Double } from 'aws-sdk/clients/apigateway.js';
+
 
 // Get package by ID
 export const getPackageByIDQuery = (client:PoolClient, packageID: number) => {
@@ -122,6 +122,31 @@ export const insertPackageQuery = (
   return client.query(query, [name, version]);
 };
 
+export const getlatestVersionByID = (client:PoolClient, packageID: number) => {
+  const query = `
+  SELECT 
+    MAX(version) AS MaxVersion
+  FROM 
+    package
+  WHERE 
+    name = (SELECT name FROM package WHERE id = $1);
+`;
+
+  return client.query(query, [packageID]);
+};
+
+export const getNameVersionById = (client:PoolClient, packageID: number) => {
+  const query = `
+    SELECT 
+    p.name
+FROM 
+    package p
+WHERE 
+    p.id = $1;
+
+  `;
+  return client.query(query, [packageID]);
+};
 // Insert package version
 export const insertIntoPackageData = (
   client: PoolClient,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, uploadPackage } from "./controller.js";  // Ensure the correct path
+import { getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controller.js";  // Ensure the correct path
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.delete("/reset", resetRegistry);
 router.get("/package/:id", getPackageByID);
 
 // // PUT /package/:id - Update package by ID
-// router.put("/package/:id", updatePackageByID);
+router.post("/package/:id", updatePackage);
 
 // // DELETE /package/:id - Delete package by ID
 // router.delete("/package/:id", deletePackageByID);

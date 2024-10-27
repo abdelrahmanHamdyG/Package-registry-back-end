@@ -9,22 +9,18 @@ import archiver from "archiver"; // Import archiver for zipping
 import pool from './db.js'; // Adjust the path according to your project structure
 import {
   getPackageByIDQuery,
-  getPackageByNameQuery,
-  updatePackageByIDQuery,
-  updatePackageVersionMetricsQuery,
-  deletePackageVersionsByPackageIDQuery,
-  deletePackageByIDQuery,
   insertPackageQuery,
-  searchPackagesQuery, // New
-  resetRegistryQuery,  // New
-  getPackageRatingQuery, // New
+  resetRegistryQuery,  // New 
   searchPackagesByRegExQuery,
   insertIntoPackageData,
-  insertPackageRating, // New
+  insertPackageRating,
+  getlatestVersionByID,
+  getNameVersionById, // New
 } from './queries.js';
 
 import { Logger } from './logger.js';
 import { downloadFromS3, getFile, uploadBase64ToS3, uploadDirectoryToS3, uploadZipToS3 } from './s3.js';
+import { JsxEmit } from 'typescript';
 
 // Initialize the logger
 const logger = new Logger();
@@ -154,7 +150,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       await uploadBase64ToS3(Content,  key);
 
       
-      await insertIntoPackageData(client, id, '', JSProgram, debloat, URL);
+      await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
       await insertPackageRating(client,id);
       
       res.status(201).json({
@@ -199,7 +195,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       const zipFileContent = fs.readFileSync(zipPath);
       const base64Content = zipFileContent.toString('base64');
 
-      await insertIntoPackageData(client, id, '', JSProgram, debloat, URL);
+      await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
       await insertPackageRating(client, id);
 
 
@@ -331,6 +327,132 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
   }
 };
 
+
+export const updatePackage = async (req: Request, res: Response) => {
+  const packageId:number = req.params.id as unknown as number;  // Extracting the path parameter
+
+  // Extracting from req.body
+  const { metadata, data } = req.body;
+  const { Name, Version } = metadata || {}; 
+  const { Content, URL, debloat,JSProgram } = data || {};
+  const client = await pool.connect();
+  console.log(`package id is ${packageId}`)
+  const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
+  const latestVersion=(await(getlatestVersionByID(client,packageId))).rows[0]
+  console.log(`latest verion is ${latestVersion}`)
+  console.log(`latestVersion MaxVersion is ${latestVersion.maxversion}`)
+  const v1Parts = Version.split('.').map(Number);
+  const v2Parts = (latestVersion.maxversion).split('.').map(Number);
+  let result=0;
+  for (let i = 0; i < 3; i++) {
+      if (v1Parts[i] > v2Parts[i]) result = 1;   // updated Version is the latest
+      if (v1Parts[i] < v2Parts[i]) result = -1;  // the updated version is not the latest
+  }
+  if ((!Content && !URL) || (Content && URL)|| !Name ||!Version  ||(returnedName!=Name) ) {
+    console.log(`Name is ${Name} returned name is ${returnedName}`)
+    res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
+    console.error("Error: Invalid format of Content and URL");
+    return;
+  }
+  if(result==-1){
+    res.status(200).json({message:'the updated is outdated so no thing to do'});
+  }
+  else{
+    try {
+      await client.query('BEGIN');
+      const packageMetaData = await insertPackageQuery(client, Name, Version);
+      const id= packageMetaData.rows[0].id;
+      const key = `packages/${id}.zip`; // Example key path
+      console.log(`id is ${id}`);
+      if (Content) {
+        
+        
+
+        
+        await uploadBase64ToS3(Content,  key);
+
+        
+        await insertIntoPackageData(client, id, Content, URL, debloat, JSProgram);
+        await insertPackageRating(client,id);
+        
+        res.status(201).json({
+          
+          metadata:{
+            Name:Name,
+            Version:Version,
+            ID:id
+          },
+          data:{
+            Content:Content,
+            JSProgram:JSProgram
+          }
+        });
+        console.log(`Package ${Name} version${Version} uploaded successfully`);
+        
+        await client.query('COMMIT');
+      } else {
+        // Handle cases where URL is used for ingestion instead of Content
+
+        console.log("we are cloning ")
+        const tempDir = path.join(os.tmpdir(), `repo-${id}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+
+      await  git.clone({
+            fs,
+            http,
+            dir:tempDir,
+            url: URL,
+            singleBranch: true,
+            depth: 1,
+
+        })
+        console.log("we cloned successfully")
+        const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
+        await zipDirectory(tempDir, zipPath);
+        console.log(`Zipped repository to ${zipPath}`);
+        const fileStream = fs.createReadStream(zipPath);
+        uploadZipToS3(key,fileStream,'application/zip')
+
+
+        const zipFileContent = fs.readFileSync(zipPath);
+        const base64Content = zipFileContent.toString('base64');
+
+        await insertIntoPackageData(client, id, base64Content, URL, debloat, JSProgram);
+        await insertPackageRating(client, id);
+
+
+        res.status(201).json({
+          
+          metadata:{
+            Name:Name,
+            Version:Version,
+            ID:id
+          },
+          data:{
+            Content:base64Content,
+            JSProgram:JSProgram
+          }
+        });
+
+        await client.query('COMMIT');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        if (fs.existsSync(zipPath)) {
+          fs.rmSync(zipPath);
+        }
+
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error in uploading package:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+      client.release();
+      
+    }
+  }
+};
 
 // Get package by name
 // export const getPackageByName = async (req: Request, res: Response) => {
