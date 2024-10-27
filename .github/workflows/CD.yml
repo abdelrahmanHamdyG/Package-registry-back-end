@@ -23,12 +23,12 @@ jobs:
 
     - name: Sync files to EC2 using rsync
       run: |
-        rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/PackReg2
+        rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/PackRegPh2
 
     - name: Run deployment script on EC2
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/PackReg2
+          cd ~/PackRegPh2
           # Install project dependencies
           npm install
           # Compile TypeScript files
