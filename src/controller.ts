@@ -236,7 +236,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
 export const getPackageByID = async (req: Request, res: Response)=> {
 
-  const id =req.params.id  as unknown as number 
+  const id =Number(req.params.id)
   console.log(`id from get Package by id is ${id}`);
 
   const client = await pool.connect();
@@ -342,7 +342,17 @@ export const updatePackage = async (req: Request, res: Response) => {
   const { Content, URL, debloat,JSProgram } = data || {};
   const client = await pool.connect();
   console.log(`package id is ${packageId}`)
-  const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
+  //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
+  const returnedNameWithoutRows=(await (getNameVersionById(client,packageId)))
+  if(returnedNameWithoutRows.rows.length==0){
+
+    res.status(400).json({error:"package doesn't exist" });
+    return;
+  }
+
+  const returnedName=returnedNameWithoutRows.rows[0].name
+
+
   const latestVersion=(await(getlatestVersionByID(client,packageId))).rows[0]
   console.log(`latest verion is ${latestVersion}`)
   console.log(`latestVersion MaxVersion is ${latestVersion.maxversion}`)
@@ -350,8 +360,15 @@ export const updatePackage = async (req: Request, res: Response) => {
   const v2Parts = (latestVersion.maxversion).split('.').map(Number);
   let result=0;
   for (let i = 0; i < 3; i++) {
-      if (v1Parts[i] > v2Parts[i]) result = 1;   // updated Version is the latest
-      if (v1Parts[i] < v2Parts[i]) result = -1;  // the updated version is not the latest
+      if (v1Parts[i] > v2Parts[i]){ 
+         result = 1;
+          break;
+
+      }   // updated Version is the latest
+      if (v1Parts[i] < v2Parts[i]){
+         result = -1;
+         break;
+        }
   }
   if ((!Content && !URL) || (Content && URL)|| !Name ||!Version  ||(returnedName!=Name) ) {
     console.log(`Name is ${Name} returned name is ${returnedName}`)
@@ -360,7 +377,8 @@ export const updatePackage = async (req: Request, res: Response) => {
     return;
   }
   if(result==-1){
-    res.status(200).json({message:'the updated is outdated so no thing to do'});
+    res.status(300).json({error:'the updated is outdated so no thing to do'});
+    return;
   }
   else{
     try {
