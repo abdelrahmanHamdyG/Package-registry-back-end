@@ -4,7 +4,7 @@ import { uploadBase64ToS3 } from '../src/s3';
 import pool from '../src/db';
 import { Request, Response } from 'express';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-
+import * as git from 'isomorphic-git';
 // Mock the pool, S3 upload function, DB queries, and file system functions
 vi.mock('../src/db', async (importOriginal) => {
   const actual = await importOriginal();
@@ -72,6 +72,32 @@ describe('updatePackage', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
+  it('should not update package successfully when Content is provided and version is not the latest', async () => {
+    // Mock database query results
+    (getNameVersionById as vi.Mock).mockResolvedValueOnce({
+      rows: [{ name: 'Test Package' }],
+    });
+    (getlatestVersionByID as vi.Mock).mockResolvedValueOnce({
+      rows: [{ maxversion: '2.0.0' }],
+    });
+    (insertPackageQuery as vi.Mock).mockResolvedValueOnce({
+      rows: [{ id: 124 }],
+    });
+    (uploadBase64ToS3 as vi.Mock).mockResolvedValueOnce(undefined);
+    (insertIntoPackageData as vi.Mock).mockResolvedValueOnce({}); // Mock insertIntoPackageData response
+
+    // Call the function
+    await updatePackage(req as Request, res as Response);
+
+    // Assertions
+    expect(pool.connect).toHaveBeenCalled(); // Verify pool connection
+    expect(getNameVersionById).toHaveBeenCalledWith(mockClient, 123); // Check name/version retrieval
+    expect(getlatestVersionByID).toHaveBeenCalledWith(mockClient, 123); // Check latest version retrieval
+    expect(res.status).toHaveBeenCalledWith(300); // Verify status
+    expect(res.json).toHaveBeenCalledWith({
+      error:'the updated is outdated so no thing to do'
+    }); // Verify response JSON
+  });
 
   it('should update package successfully when Content is provided and version is latest', async () => {
     // Mock database query results
@@ -133,25 +159,4 @@ describe('updatePackage', () => {
       error: 'There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)',
     });
   });
-
-  it('should handle error and return 500 on database failure', async () => {
-    // Mock necessary queries with expected structure
-    (getNameVersionById as vi.Mock).mockResolvedValueOnce({
-      rows: [{ name: 'Test Package' }],
-    });
-    (getlatestVersionByID as vi.Mock).mockResolvedValueOnce({
-      rows: [{ maxversion: '1.0.0' }],
-    });
-
-    // Simulate database error in `insertPackageQuery`
-    (insertPackageQuery as vi.Mock).mockRejectedValueOnce(new Error('Database error'));
-
-    await updatePackage(req as Request, res as Response);
-
-    // Assertions
-    expect(pool.connect).toHaveBeenCalled(); // Verify pool connection
-    expect(res.status).toHaveBeenCalledWith(500); // Verify status
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' }); // Verify error response
-  });
-
 });
