@@ -122,18 +122,26 @@ export const insertPackageQuery = (
   return client.query(query, [name, version]);
 };
 
-export const getlatestVersionByID = (client:PoolClient, packageID: number) => {
+export const getLatestPackage = (client:PoolClient, packageID: number) => {
   const query = `
   SELECT 
-    MAX(version) AS MaxVersion
-  FROM 
-    package
-  WHERE 
-    name = (SELECT name FROM package WHERE id = $1);
+    p.version,
+    pd.url
+FROM 
+    package p
+JOIN 
+    package_data pd ON pd.package_id = p.id
+WHERE 
+    p.name = (SELECT name FROM package WHERE id = $1)
+ORDER BY 
+    p.version DESC
+LIMIT 1;
+
 `;
 
   return client.query(query, [packageID]);
 };
+
 
 export const getNameVersionById = (client:PoolClient, packageID: number) => {
   const query = `
