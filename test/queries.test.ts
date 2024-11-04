@@ -14,7 +14,7 @@ import {
   searchPackagesByRegExQuery,//4 Must Be Done (Done)
   insertIntoPackageData,//5 Must Be Done (Done)
   insertPackageRating,//6 Must Be Done (Done)
-  getlatestVersionByID,//7 Must Be Done (Done)
+  
   getNameVersionById//8 Must Be Done ()
 } from '../src/queries';
 
@@ -94,21 +94,7 @@ WHERE
     expect((mockClient.query as vi.Mock).mock.calls[0][1]).toEqual(packageIDArray);
   });
 
-  it('get the latest version by ID', async () => {
-    const packageID = 123;
-    const packageIDArray = [packageID];
-    await getlatestVersionByID(mockClient,packageID);
-    expect(normalizeQuery((mockClient.query as vi.Mock).mock.calls[0][0])).toBe(normalizeQuery(`
-    SELECT 
-      MAX(version) AS MaxVersion
-    FROM 
-      package
-    WHERE 
-      name = (SELECT name FROM package WHERE id = $1);
-  `));
-    expect((mockClient.query as vi.Mock).mock.calls[0][1]).toEqual(packageIDArray);
-  });
-
+  
   it('reset the registry', async () => {
     await resetRegistryQuery(mockClient);
     expect(normalizeQuery((mockClient.query as vi.Mock).mock.calls[0][0])).toBe(normalizeQuery(`

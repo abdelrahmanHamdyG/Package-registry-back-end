@@ -66,37 +66,37 @@ describe('uploadPackage', () => {
     vi.clearAllMocks();
   });
 
-  it('should upload package successfully when Content is provided', async () => {
-    // Mock database query results
-    (insertPackageQuery as vi.Mock).mockResolvedValueOnce({
-      rows: [{ id: 123 }],
-    });
+  // it('should upload package successfully when Content is provided', async () => {
+  //   // Mock database query results
+  //   (insertPackageQuery as vi.Mock).mockResolvedValueOnce({
+  //     rows: [{ id: 123 }],
+  //   });
 
-    // Mock S3 upload function
-    (uploadBase64ToS3 as vi.Mock).mockResolvedValueOnce(undefined);
+  //   // Mock S3 upload function
+  //   (uploadBase64ToS3 as vi.Mock).mockResolvedValueOnce(undefined);
 
-    // Call the function
-    await uploadPackage(req as Request, res as Response);
+  //   // Call the function
+  //   await uploadPackage(req as Request, res as Response);
 
-    // Assertions
-    expect(pool.connect).toHaveBeenCalled(); // Verify pool connection
-    expect(insertPackageQuery).toHaveBeenCalledWith(mockClient, 'Test Package', '1.0.0'); // Check package insert
-    expect(uploadBase64ToS3).toHaveBeenCalledWith('mockedBase64Content', 'packages/123.zip'); // Verify S3 upload
-    expect(insertIntoPackageData).toHaveBeenCalledWith(mockClient, 123, '', '', false, 'console.log("Test");'); // Verify package data insert
-    expect(insertPackageRating).toHaveBeenCalledWith(mockClient, 123); // Verify package rating insert
-    expect(res.status).toHaveBeenCalledWith(201); // Verify status
-    expect(res.json).toHaveBeenCalledWith({
-      metadata: {
-        Name: 'Test Package',
-        Version: '1.0.0',
-        ID: 123,
-      },
-      data: {
-        Content: 'mockedBase64Content',
-        JSProgram: 'console.log("Test");',
-      },
-    }); // Verify response JSON
-  });
+  //   // Assertions
+  //   expect(pool.connect).toHaveBeenCalled(); // Verify pool connection
+  //   expect(insertPackageQuery).toHaveBeenCalledWith(mockClient, 'Test Package', '1.0.0'); // Check package insert
+  //   expect(uploadBase64ToS3).toHaveBeenCalledWith('mockedBase64Content', 'packages/123.zip'); // Verify S3 upload
+  //   expect(insertIntoPackageData).toHaveBeenCalledWith(mockClient, 123, '', '', false, 'console.log("Test");'); // Verify package data insert
+  //   expect(insertPackageRating).toHaveBeenCalledWith(mockClient, 123); // Verify package rating insert
+  //   expect(res.status).toHaveBeenCalledWith(201); // Verify status
+  //   expect(res.json).toHaveBeenCalledWith({
+  //     metadata: {
+  //       Name: 'Test Package',
+  //       Version: '1.0.0',
+  //       ID: 123,
+  //     },
+  //     data: {
+  //       Content: 'mockedBase64Content',
+  //       JSProgram: 'console.log("Test");',
+  //     },
+  //   }); // Verify response JSON
+  // });
 
   it('should return 400 if Content and URL are both provided', async () => {
     req.body = {

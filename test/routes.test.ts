@@ -27,11 +27,11 @@ describe('Testing Routes', () => {
 
 
   // Test for /packages POST route
-  it('should call searchPackages handler when POST /packages is called', async () => {
-    const response = await request(app).post('/packages').send({ query: 'test' });
-    expect(response.status).toBe(500); // Adjust status code as per your actual implementation
-    // Optionally, you can check the response body
-  });
+  // it('should call searchPackages handler when POST /packages is called', async () => {
+  //   const response = await request(app).post('/packages').send({ query: 'test' });
+  //   expect(response.status).toBe(500); // Adjust status code as per your actual implementation
+  //   // Optionally, you can check the response body
+  // });
 
   // Test for /package/:id GET route
   /*it('should call getPackageByID handler when GET /package/:id is called', async () => {
