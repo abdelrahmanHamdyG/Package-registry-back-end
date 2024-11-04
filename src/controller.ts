@@ -1,5 +1,5 @@
 // controller.ts
-import { Request, Response } from 'express';
+import e, { Request, Response } from 'express';
 import http from "isomorphic-git/http/node/index.js";
 import * as git from 'isomorphic-git'
 import fs from 'fs'
@@ -126,6 +126,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+let adj_list=new Map<string,Set<string>>()
   export const uploadPackage = async (req: Request, res: Response) => {
     const { Name, Content, JSProgram, debloat, URL } = req.body;
     console.log(`Name is ${Name}`)
@@ -149,6 +150,8 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       const id:number = packageMetaData.rows[0].id;
       const key = `packages/${id}.zip`; // Example key path
       console.log(`id is ${id}`);
+
+      let dependencies=new Set<string>
       if (Content) {
         
         // now we need to deploat but first unzipping 
@@ -175,7 +178,6 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
         const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
         const base64FinalContent = finalZipContent.toString('base64');
-
 
 
 
@@ -216,6 +218,20 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
         await client.query('COMMIT');
       } else {
         // Handle cases where URL is used for ingestion instead of Content
+
+        
+
+        if(!URL.includes("github")){
+          console.log("not github")
+          let package_name=get_npm_package_name(URL)
+          
+          await get_npm_adjacency_list(package_name)
+          for (const x of adj_list){
+            console.log(x)
+          }
+          return 
+          
+        }
 
         console.log("we are cloning ")
         const tempDir = path.join(os.tmpdir(), `repo-${id}`);
@@ -445,6 +461,7 @@ export const updatePackage = async (req: Request, res: Response) => {
       const id= packageMetaData.rows[0].id;
       const key = `packages/${id}.zip`; // Example key path
       console.log(`id is ${id}`);
+      let dependencies:string[]=[]
       if (Content) {
         
         
@@ -472,6 +489,10 @@ export const updatePackage = async (req: Request, res: Response) => {
         
         await client.query('COMMIT');
       } else {
+
+      
+
+
         // Handle cases where URL is used for ingestion instead of Content
 
         console.log("we are cloning ")
@@ -586,3 +607,84 @@ const debloat_file=async (dir:string)=>{
     }
   }
 }
+
+
+
+
+
+const get_npm_adjacency_list = async (packageName: string) => {
+    const url = `https://registry.npmjs.org/${packageName}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Could not fetch data for package: ${packageName}`);
+        }
+        
+        const data = await response.json();
+        const latestVersion = data['dist-tags'].latest;
+        const dependencies = data.versions[latestVersion].dependencies || {};
+
+        
+        if (adj_list.has(packageName)) {
+            return
+        }
+
+        adj_list.set(packageName, new Set<string>());
+
+        
+        for (const dependency of Object.keys(dependencies)) {
+            adj_list.get(packageName)!.add(dependency);  
+
+
+            await get_npm_adjacency_list(dependency);
+            
+        }
+    } catch (error) {
+        if (error instanceof Error) {
+            console.error(error.message);
+        }
+    }
+
+    
+};
+
+const get_npm_package_name=(path:string):string=>{
+
+    let path_as_parts=path.split('/')
+    return path_as_parts[path_as_parts.length-1]
+
+}
+
+const calculate_cost=(package_name:string)=>{
+
+
+  let size=0
+  for (const pack in adj_list.get(package_name)){
+
+      
+  }
+
+
+
+}
+
+
+const fetch_package_size = async (packageName: string): Promise<number> => {
+    const url = `https://registry.npmjs.org/${packageName}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Could not fetch data for package: ${packageName}`);
+        }
+
+        const data = await response.json();
+        const latestVersion = data['dist-tags'].latest;
+        const size = data.versions[latestVersion].dist.unpackedSize;
+
+        return size; // Size in bytes
+    } catch (error) {
+        console.error(`Error fetching size for ${packageName}:`, error);
+        return 0; // Return 0 if there's an error
+    }
+};
