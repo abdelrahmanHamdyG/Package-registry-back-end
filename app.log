@@ -239,3 +239,491 @@
 2024-11-10T18:32:28.904Z - Removed cloned repository directory: \tmp\facebook-react
 2024-11-10T18:32:28.906Z - Ramp-up metric for npm package react completed. Score: 0, Latency: 14705.6153
 2024-11-10T18:32:28.910Z - Metrics calculated for https://www.npmjs.com/package/react: {"RampUp":0,"Correctness":0.8333333333333334,"BusFactor":0.03333333333333333,"BusFactorLatency":2.271,"ResponsiveMaintainer":0.9914893710540335,"ResponsiveMaintainer_Latency":3.842,"License":{"score":1,"latency":2.172},"CorrectnessLatency":2.519,"RampUp_Latency":14.706}
+2024-11-10T18:37:42.029Z - Processing URL: https://www.npmjs.com/package/react
+2024-11-10T18:37:42.214Z - Fetching npm package metadata for react
+2024-11-10T18:37:42.214Z - Fetching npm package info for react
+2024-11-10T18:37:42.217Z - Fetching npm package info for react
+2024-11-10T18:37:42.218Z - Fetching download stats for npm package react
+2024-11-10T18:37:42.267Z - Calculating ramp-up for npm package: react
+2024-11-10T18:37:42.268Z - Fetching npm download stats for react
+2024-11-10T18:37:42.567Z - Download count for react: 113275160
+2024-11-10T18:37:42.568Z - Download count for react: 113275160
+2024-11-10T18:37:42.569Z - Fetching GitHub repository URL for react
+2024-11-10T18:37:42.570Z - Fetching package metadata for react
+2024-11-10T18:37:43.113Z - Found GitHub repository URL for react
+2024-11-10T18:37:43.114Z - Fetching license information for facebook/react
+2024-11-10T18:37:43.234Z - Fetching GitHub repository URL for react
+2024-11-10T18:37:43.235Z - Found GitHub repository URL for react, calculating Bus Factor for GitHub repository
+2024-11-10T18:37:43.236Z - Fetching GitHub contributors for facebook/react
+2024-11-10T18:37:43.491Z - Found GitHub repository URL for react: git+https://github.com/facebook/react.git
+2024-11-10T18:37:43.491Z - Calculating ramp-up metric for GitHub repository facebook/react
+2024-11-10T18:37:43.492Z - Calculating ramp-up metric for GitHub repository facebook/react
+2024-11-10T18:37:43.493Z - Cloning repository facebook/react to \tmp\facebook-react
+2024-11-10T18:37:43.680Z - Found GitHub repository for react: git+https://github.com/facebook/react.git
+2024-11-10T18:37:43.681Z - Calculating GitHub responsiveness for facebook/react
+2024-11-10T18:37:43.682Z - Fetching issues from facebook/react, page 1
+2024-11-10T18:37:43.702Z - License found for facebook/react: MIT
+2024-11-10T18:37:43.705Z - License compatibility score for facebook/react: 1
+2024-11-10T18:37:43.706Z - License score for npm package react: 1
+2024-11-10T18:37:43.757Z - Found GitHub repository URL for react, calculating correctness for GitHub repository
+2024-11-10T18:37:43.757Z - Fetching GitHub issues for facebook/react
+2024-11-10T18:37:43.823Z - Found 30 contributors for facebook/react
+2024-11-10T18:37:43.826Z - Calculated Bus Factor for facebook/react: 0.03333333333333333
+2024-11-10T18:37:44.175Z - Found 5 bug issues for facebook/react
+2024-11-10T18:37:44.176Z - facebook/react has 30 issues 
+2024-11-10T18:37:44.176Z - Calculated correctness for facebook/react: 0.8333333333333334
+2024-11-10T18:37:44.428Z - Found 100 issues for facebook/react
+2024-11-10T18:37:44.429Z - Fetching issue 31473 from facebook/react
+2024-11-10T18:37:44.430Z - Fetching issue 31472 from facebook/react
+2024-11-10T18:37:44.432Z - Fetching issue 31471 from facebook/react
+2024-11-10T18:37:44.433Z - Fetching issue 31470 from facebook/react
+2024-11-10T18:37:44.435Z - Fetching issue 31469 from facebook/react
+2024-11-10T18:37:44.437Z - Fetching issue 31468 from facebook/react
+2024-11-10T18:37:44.438Z - Fetching issue 31467 from facebook/react
+2024-11-10T18:37:44.440Z - Fetching issue 31466 from facebook/react
+2024-11-10T18:37:44.442Z - Fetching issue 31465 from facebook/react
+2024-11-10T18:37:44.444Z - Fetching issue 31464 from facebook/react
+2024-11-10T18:37:44.446Z - Fetching issue 31463 from facebook/react
+2024-11-10T18:37:44.447Z - Fetching issue 31462 from facebook/react
+2024-11-10T18:37:44.449Z - Fetching issue 31461 from facebook/react
+2024-11-10T18:37:44.451Z - Fetching issue 31459 from facebook/react
+2024-11-10T18:37:44.452Z - Fetching issue 31458 from facebook/react
+2024-11-10T18:37:44.454Z - Fetching issue 31457 from facebook/react
+2024-11-10T18:37:44.456Z - Fetching issue 31456 from facebook/react
+2024-11-10T18:37:44.458Z - Fetching issue 31455 from facebook/react
+2024-11-10T18:37:44.460Z - Fetching issue 31453 from facebook/react
+2024-11-10T18:37:44.462Z - Fetching issue 31452 from facebook/react
+2024-11-10T18:37:44.463Z - Fetching issue 31451 from facebook/react
+2024-11-10T18:37:44.465Z - Fetching issue 31450 from facebook/react
+2024-11-10T18:37:44.466Z - Fetching issue 31449 from facebook/react
+2024-11-10T18:37:44.468Z - Fetching issue 31448 from facebook/react
+2024-11-10T18:37:44.469Z - Fetching issue 31447 from facebook/react
+2024-11-10T18:37:44.471Z - Fetching issue 31446 from facebook/react
+2024-11-10T18:37:44.472Z - Fetching issue 31445 from facebook/react
+2024-11-10T18:37:44.474Z - Fetching issue 31444 from facebook/react
+2024-11-10T18:37:44.476Z - Fetching issue 31443 from facebook/react
+2024-11-10T18:37:44.478Z - Fetching issue 31442 from facebook/react
+2024-11-10T18:37:44.479Z - Fetching issue 31441 from facebook/react
+2024-11-10T18:37:44.481Z - Fetching issue 31440 from facebook/react
+2024-11-10T18:37:44.482Z - Fetching issue 31439 from facebook/react
+2024-11-10T18:37:44.484Z - Fetching issue 31438 from facebook/react
+2024-11-10T18:37:44.485Z - Fetching issue 31437 from facebook/react
+2024-11-10T18:37:44.487Z - Fetching issue 31436 from facebook/react
+2024-11-10T18:37:44.488Z - Fetching issue 31435 from facebook/react
+2024-11-10T18:37:44.490Z - Fetching issue 31434 from facebook/react
+2024-11-10T18:37:44.492Z - Fetching issue 31433 from facebook/react
+2024-11-10T18:37:44.493Z - Fetching issue 31432 from facebook/react
+2024-11-10T18:37:44.495Z - Fetching issue 31431 from facebook/react
+2024-11-10T18:37:44.496Z - Fetching issue 31430 from facebook/react
+2024-11-10T18:37:44.498Z - Fetching issue 31429 from facebook/react
+2024-11-10T18:37:44.499Z - Fetching issue 31428 from facebook/react
+2024-11-10T18:37:44.501Z - Fetching issue 31427 from facebook/react
+2024-11-10T18:37:44.502Z - Fetching issue 31426 from facebook/react
+2024-11-10T18:37:44.504Z - Fetching issue 31425 from facebook/react
+2024-11-10T18:37:44.505Z - Fetching issue 31422 from facebook/react
+2024-11-10T18:37:44.507Z - Fetching issue 31420 from facebook/react
+2024-11-10T18:37:44.509Z - Fetching issue 31419 from facebook/react
+2024-11-10T18:37:44.510Z - Fetching issue 31418 from facebook/react
+2024-11-10T18:37:44.512Z - Fetching issue 31417 from facebook/react
+2024-11-10T18:37:44.514Z - Fetching issue 31416 from facebook/react
+2024-11-10T18:37:44.515Z - Fetching issue 31415 from facebook/react
+2024-11-10T18:37:44.517Z - Fetching issue 31414 from facebook/react
+2024-11-10T18:37:44.518Z - Fetching issue 31413 from facebook/react
+2024-11-10T18:37:44.520Z - Fetching issue 31412 from facebook/react
+2024-11-10T18:37:44.521Z - Fetching issue 31411 from facebook/react
+2024-11-10T18:37:44.523Z - Fetching issue 31410 from facebook/react
+2024-11-10T18:37:44.525Z - Fetching issue 31409 from facebook/react
+2024-11-10T18:37:44.526Z - Fetching issue 31408 from facebook/react
+2024-11-10T18:37:44.528Z - Fetching issue 31407 from facebook/react
+2024-11-10T18:37:44.529Z - Fetching issue 31406 from facebook/react
+2024-11-10T18:37:44.531Z - Fetching issue 31405 from facebook/react
+2024-11-10T18:37:44.532Z - Fetching issue 31404 from facebook/react
+2024-11-10T18:37:44.534Z - Fetching issue 31403 from facebook/react
+2024-11-10T18:37:44.535Z - Fetching issue 31402 from facebook/react
+2024-11-10T18:37:44.537Z - Fetching issue 31401 from facebook/react
+2024-11-10T18:37:44.539Z - Fetching issue 31400 from facebook/react
+2024-11-10T18:37:44.540Z - Fetching issue 31399 from facebook/react
+2024-11-10T18:37:44.542Z - Fetching issue 31398 from facebook/react
+2024-11-10T18:37:44.543Z - Fetching issue 31397 from facebook/react
+2024-11-10T18:37:44.545Z - Fetching issue 31396 from facebook/react
+2024-11-10T18:37:44.546Z - Fetching issue 31395 from facebook/react
+2024-11-10T18:37:44.548Z - Fetching issue 31394 from facebook/react
+2024-11-10T18:37:44.549Z - Fetching issue 31393 from facebook/react
+2024-11-10T18:37:44.551Z - Fetching issue 31392 from facebook/react
+2024-11-10T18:37:44.552Z - Fetching issue 31391 from facebook/react
+2024-11-10T18:37:44.554Z - Fetching issue 31390 from facebook/react
+2024-11-10T18:37:44.555Z - Fetching issue 31389 from facebook/react
+2024-11-10T18:37:44.557Z - Fetching issue 31388 from facebook/react
+2024-11-10T18:37:44.558Z - Fetching issue 31387 from facebook/react
+2024-11-10T18:37:44.560Z - Fetching issue 31386 from facebook/react
+2024-11-10T18:37:44.561Z - Fetching issue 31385 from facebook/react
+2024-11-10T18:37:44.563Z - Fetching issue 31384 from facebook/react
+2024-11-10T18:37:44.564Z - Fetching issue 31383 from facebook/react
+2024-11-10T18:37:44.566Z - Fetching issue 31382 from facebook/react
+2024-11-10T18:37:44.567Z - Fetching issue 31381 from facebook/react
+2024-11-10T18:37:44.569Z - Fetching issue 31380 from facebook/react
+2024-11-10T18:37:44.571Z - Fetching issue 31379 from facebook/react
+2024-11-10T18:37:44.572Z - Fetching issue 31378 from facebook/react
+2024-11-10T18:37:44.574Z - Fetching issue 31377 from facebook/react
+2024-11-10T18:37:44.576Z - Fetching issue 31376 from facebook/react
+2024-11-10T18:37:44.578Z - Fetching issue 31375 from facebook/react
+2024-11-10T18:37:44.579Z - Fetching issue 31373 from facebook/react
+2024-11-10T18:37:44.581Z - Fetching issue 31372 from facebook/react
+2024-11-10T18:37:44.583Z - Fetching issue 31371 from facebook/react
+2024-11-10T18:37:44.585Z - Fetching issue 31370 from facebook/react
+2024-11-10T18:37:44.586Z - Fetching issue 31369 from facebook/react
+2024-11-10T18:37:44.588Z - Fetching issue 31368 from facebook/react
+2024-11-10T18:37:44.856Z - Response time for issue 31473: 0.14443119212962963 days
+2024-11-10T18:37:44.877Z - Response time for issue 31447: 3.2343388425925927 days
+2024-11-10T18:37:44.878Z - Response time for issue 31462: 2.042348125 days
+2024-11-10T18:37:44.916Z - Response time for issue 31464: 0.19777777777777777 days
+2024-11-10T18:37:44.917Z - Response time for issue 31470: 0.6429619907407408 days
+2024-11-10T18:37:44.917Z - Response time for issue 31449: 0.20266203703703703 days
+2024-11-10T18:37:44.918Z - Response time for issue 31455: 2.4138879398148148 days
+2024-11-10T18:37:44.919Z - Response time for issue 31469: 0.6583671064814814 days
+2024-11-10T18:37:44.928Z - Response time for issue 31456: 2.337545451388889 days
+2024-11-10T18:37:44.930Z - Response time for issue 31472: 0.1890616898148148 days
+2024-11-10T18:37:44.930Z - Response time for issue 31471: 0.21717511574074075 days
+2024-11-10T18:37:44.931Z - Response time for issue 31436: 4.301202905092593 days
+2024-11-10T18:37:44.932Z - Response time for issue 31450: 0.20078703703703704 days
+2024-11-10T18:37:44.932Z - Response time for issue 31461: 1.5569444444444445 days
+2024-11-10T18:37:44.933Z - Response time for issue 31465: 1.0058912037037038 days
+2024-11-10T18:37:44.934Z - Response time for issue 31468: 1.0419899652777778 days
+2024-11-10T18:37:44.934Z - Response time for issue 31396: 9.240867291666667 days
+2024-11-10T18:37:44.935Z - Response time for issue 31441: 0.002662037037037037 days
+2024-11-10T18:37:44.936Z - Response time for issue 31393: 10.446156666666667 days
+2024-11-10T18:37:44.936Z - Response time for issue 31414: 1.7358449074074074 days
+2024-11-10T18:37:44.938Z - Response time for issue 31389: 0.7438541666666667 days
+2024-11-10T18:37:44.939Z - Response time for issue 31420: 0.25697916666666665 days
+2024-11-10T18:37:44.940Z - Response time for issue 31446: 3.403830324074074 days
+2024-11-10T18:37:44.941Z - Response time for issue 31435: 0.6379513888888889 days
+2024-11-10T18:37:44.943Z - Response time for issue 31395: 9.409247025462962 days
+2024-11-10T18:37:44.946Z - Response time for issue 31432: 0.001388888888888889 days
+2024-11-10T18:37:44.946Z - Response time for issue 31390: 0.7670601851851852 days
+2024-11-10T18:37:44.947Z - Response time for issue 31388: 11.130473923611111 days
+2024-11-10T18:37:44.948Z - Response time for issue 31409: 4.126157407407407 days
+2024-11-10T18:37:44.948Z - Response time for issue 31451: 0.007662037037037037 days
+2024-11-10T18:37:44.949Z - Response time for issue 31445: 3.5693859837962965 days
+2024-11-10T18:37:44.950Z - Response time for issue 31391: 0.8388657407407407 days
+2024-11-10T18:37:44.963Z - Response time for issue 31438: 0.005740740740740741 days
+2024-11-10T18:37:44.971Z - Response time for issue 31392: 2.0975810185185186 days
+2024-11-10T18:37:44.972Z - Response time for issue 31403: 0.003946759259259259 days
+2024-11-10T18:37:44.973Z - Response time for issue 31394: 9.947789039351852 days
+2024-11-10T18:37:44.976Z - Response time for issue 31440: 0.0028819444444444444 days
+2024-11-10T18:37:44.977Z - Response time for issue 31370: 1.4338773148148147 days
+2024-11-10T18:37:44.978Z - Response time for issue 31406: 8.06437474537037 days
+2024-11-10T18:37:44.979Z - Response time for issue 31380: 12.506944201388889 days
+2024-11-10T18:37:44.981Z - Response time for issue 31383: 0.1451388888888889 days
+2024-11-10T18:37:44.982Z - Response time for issue 31372: 0.12657407407407406 days
+2024-11-10T18:37:44.982Z - Response time for issue 31386: 11.63821738425926 days
+2024-11-10T18:37:44.983Z - Response time for issue 31379: 2.869537037037037 days
+2024-11-10T18:37:44.984Z - Response time for issue 31382: 11.906944247685185 days
+2024-11-10T18:37:44.985Z - Response time for issue 31376: 0.02277777777777778 days
+2024-11-10T18:37:44.989Z - Response time for issue 31371: 1.1705671296296296 days
+2024-11-10T18:37:44.990Z - Response time for issue 31378: 9.069733796296296 days
+2024-11-10T18:37:44.994Z - Response time for issue 31375: 13.314085567129629 days
+2024-11-10T18:37:44.994Z - Response time for issue 31384: 0.14526620370370372 days
+2024-11-10T18:37:44.995Z - Response time for issue 31373: 0.007361111111111111 days
+2024-11-10T18:37:44.996Z - Response time for issue 31368: 0.8652430555555556 days
+2024-11-10T18:37:45.001Z - Response time for issue 31381: 1.504212962962963 days
+2024-11-10T18:37:45.024Z - Response time for issue 31369: 0.6634722222222222 days
+2024-11-10T18:37:45.027Z - Response time for issue 31377: 9.06611111111111 days
+2024-11-10T18:37:45.031Z - Response time for issue 31385: 0.14748842592592593 days
+2024-11-10T18:37:45.042Z - Response time for issue 31400: 5.056446759259259 days
+2024-11-10T18:37:45.274Z - Response time for issue 31387: 0.05603009259259259 days
+2024-11-10T18:37:45.281Z - Response time for issue 31439: 0.8705902777777778 days
+2024-11-10T18:37:45.355Z - Response time for issue 31437: 0.004027777777777778 days
+2024-11-10T18:37:45.357Z - Response time for issue 31398: 9.212909224537038 days
+2024-11-10T18:37:45.362Z - Response time for issue 31418: 5.685976400462963 days
+2024-11-10T18:37:45.363Z - Response time for issue 31397: 9.214564386574073 days
+2024-11-10T18:37:45.374Z - Response time for issue 31413: 0.013657407407407408 days
+2024-11-10T18:37:45.375Z - Response time for issue 31412: 6.0046571180555555 days
+2024-11-10T18:37:45.376Z - Response time for issue 31428: 0.0069328703703703705 days
+2024-11-10T18:37:45.380Z - Response time for issue 31411: 6.209923368055556 days
+2024-11-10T18:37:45.381Z - Response time for issue 31433: 0.7218402777777778 days
+2024-11-10T18:37:45.382Z - Response time for issue 31415: 1.7325462962962963 days
+2024-11-10T18:37:45.383Z - Response time for issue 31458: 2.1964280439814816 days
+2024-11-10T18:37:45.387Z - Response time for issue 31429: 0.07474537037037036 days
+2024-11-10T18:37:45.387Z - Response time for issue 31425: 0.16159722222222223 days
+2024-11-10T18:37:45.388Z - Response time for issue 31419: 2.4490162037037035 days
+2024-11-10T18:37:45.389Z - Response time for issue 31427: 0.09913194444444444 days
+2024-11-10T18:37:45.389Z - Response time for issue 31422: 5.147400335648149 days
+2024-11-10T18:37:45.390Z - Response time for issue 31399: 9.168835532407407 days
+2024-11-10T18:37:45.404Z - Response time for issue 31431: 0.011909722222222223 days
+2024-11-10T18:37:45.407Z - Response time for issue 31459: 2.1868218402777777 days
+2024-11-10T18:37:45.408Z - Response time for issue 31457: 2.229171388888889 days
+2024-11-10T18:37:45.409Z - Response time for issue 31467: 1.042608900462963 days
+2024-11-10T18:37:45.409Z - Response time for issue 31444: 3.5727362152777777 days
+2024-11-10T18:37:45.410Z - Response time for issue 31426: 1.9083564814814815 days
+2024-11-10T18:37:45.410Z - Response time for issue 31410: 6.267261689814815 days
+2024-11-10T18:37:45.413Z - Response time for issue 31452: 0.8000462962962963 days
+2024-11-10T18:37:45.417Z - Response time for issue 31453: 2.7777131597222224 days
+2024-11-10T18:37:45.425Z - Response time for issue 31463: 1.9847387152777778 days
+2024-11-10T18:37:45.426Z - Response time for issue 31407: 8.050340578703704 days
+2024-11-10T18:37:45.427Z - Response time for issue 31442: 0.002523148148148148 days
+2024-11-10T18:37:45.434Z - Response time for issue 31417: 5.832204085648148 days
+2024-11-10T18:37:45.435Z - Response time for issue 31448: 3.1481647569444444 days
+2024-11-10T18:37:45.445Z - Response time for issue 31443: 0.026064814814814815 days
+2024-11-10T18:37:45.446Z - Response time for issue 31466: 1.7589634953703703 days
+2024-11-10T18:37:45.486Z - Response time for issue 31430: 0.0035416666666666665 days
+2024-11-10T18:37:45.549Z - Response time for issue 31404: 2.7297453703703702 days
+2024-11-10T18:37:45.870Z - Response time for issue 31408: 0.33047453703703705 days
+2024-11-10T18:37:45.873Z - Response time for issue 31402: 8.87190824074074 days
+2024-11-10T18:37:45.885Z - Response time for issue 31405: 0.0001273148148148148 days
+2024-11-10T18:37:45.896Z - Response time for issue 31416: 5.872637673611111 days
+2024-11-10T18:37:45.917Z - Response time for issue 31401: 9.028355520833333 days
+2024-11-10T18:37:45.985Z - Response time for issue 31434: 4.857152604166667 days
+2024-11-10T18:37:45.986Z - Responsiveness for facebook/react: 0.9914845903602232
+2024-11-10T18:37:45.986Z - Responsiveness for npm package react: 0.9914845903602232
+2024-11-10T18:38:01.140Z - Repository cloned successfully to \tmp\facebook-react
+2024-11-10T18:38:01.147Z - README.md found in the cloned repository
+2024-11-10T18:38:01.151Z - README file size: 5.1923828125 KB
+2024-11-10T18:38:01.153Z - Small README. Score: 3
+2024-11-10T18:38:01.157Z - Ramp-up metric calculation completed for facebook/react. Score: 0.3, Latency: 17663.3905
+2024-11-10T18:38:02.426Z - Removed cloned repository directory: \tmp\facebook-react
+2024-11-10T18:38:02.427Z - Ramp-up metric for npm package react completed. Score: 0.3, Latency: 20159.9074
+2024-11-10T18:38:02.428Z - Metrics calculated for https://www.npmjs.com/package/react: {"RampUp":0.3,"Correctness":0.8333333333333334,"BusFactor":0.03333333333333333,"BusFactorLatency":2.203,"ResponsiveMaintainer":0.9914845903602232,"ResponsiveMaintainer_Latency":3.769,"License":{"score":1,"latency":2.082},"CorrectnessLatency":2.382,"RampUp_Latency":20.16}
+2024-11-10T18:38:48.109Z - Processing URL: https://www.npmjs.com/package/react
+2024-11-10T18:38:48.319Z - Fetching download stats for npm package react
+2024-11-10T18:38:48.320Z - Fetching npm package metadata for react
+2024-11-10T18:38:48.321Z - Fetching npm package info for react
+2024-11-10T18:38:48.326Z - Fetching npm package info for react
+2024-11-10T18:38:48.393Z - Calculating ramp-up for npm package: react
+2024-11-10T18:38:48.394Z - Fetching npm download stats for react
+2024-11-10T18:38:48.528Z - Fetching GitHub repository URL for react
+2024-11-10T18:38:48.541Z - Download count for react: 113275160
+2024-11-10T18:38:48.547Z - Download count for react: 113275160
+2024-11-10T18:38:48.548Z - Fetching package metadata for react
+2024-11-10T18:38:49.029Z - Fetching GitHub repository URL for react
+2024-11-10T18:38:49.030Z - Found GitHub repository URL for react, calculating Bus Factor for GitHub repository
+2024-11-10T18:38:49.031Z - Fetching GitHub contributors for facebook/react
+2024-11-10T18:38:49.608Z - Found 30 contributors for facebook/react
+2024-11-10T18:38:49.608Z - Calculated Bus Factor for facebook/react: 0.03333333333333333
+2024-11-10T18:38:49.644Z - Found GitHub repository URL for react: git+https://github.com/facebook/react.git
+2024-11-10T18:38:49.645Z - Calculating ramp-up metric for GitHub repository facebook/react
+2024-11-10T18:38:49.646Z - Calculating ramp-up metric for GitHub repository facebook/react
+2024-11-10T18:38:49.647Z - Cloning repository facebook/react to \tmp\facebook-react
+2024-11-10T18:38:49.736Z - Found GitHub repository URL for react
+2024-11-10T18:38:49.737Z - Fetching license information for facebook/react
+2024-11-10T18:38:49.756Z - Found GitHub repository for react: git+https://github.com/facebook/react.git
+2024-11-10T18:38:49.757Z - Calculating GitHub responsiveness for facebook/react
+2024-11-10T18:38:49.757Z - Fetching issues from facebook/react, page 1
+2024-11-10T18:38:49.816Z - Found GitHub repository URL for react, calculating correctness for GitHub repository
+2024-11-10T18:38:49.818Z - Fetching GitHub issues for facebook/react
+2024-11-10T18:38:50.017Z - License found for facebook/react: MIT
+2024-11-10T18:38:50.021Z - License compatibility score for facebook/react: 1
+2024-11-10T18:38:50.024Z - License score for npm package react: 1
+2024-11-10T18:38:50.255Z - Found 5 bug issues for facebook/react
+2024-11-10T18:38:50.255Z - facebook/react has 30 issues 
+2024-11-10T18:38:50.256Z - Calculated correctness for facebook/react: 0.8333333333333334
+2024-11-10T18:38:50.475Z - Found 100 issues for facebook/react
+2024-11-10T18:38:50.476Z - Fetching issue 31473 from facebook/react
+2024-11-10T18:38:50.477Z - Fetching issue 31472 from facebook/react
+2024-11-10T18:38:50.479Z - Fetching issue 31471 from facebook/react
+2024-11-10T18:38:50.481Z - Fetching issue 31470 from facebook/react
+2024-11-10T18:38:50.483Z - Fetching issue 31469 from facebook/react
+2024-11-10T18:38:50.485Z - Fetching issue 31468 from facebook/react
+2024-11-10T18:38:50.487Z - Fetching issue 31467 from facebook/react
+2024-11-10T18:38:50.489Z - Fetching issue 31466 from facebook/react
+2024-11-10T18:38:50.491Z - Fetching issue 31465 from facebook/react
+2024-11-10T18:38:50.493Z - Fetching issue 31464 from facebook/react
+2024-11-10T18:38:50.494Z - Fetching issue 31463 from facebook/react
+2024-11-10T18:38:50.497Z - Fetching issue 31462 from facebook/react
+2024-11-10T18:38:50.498Z - Fetching issue 31461 from facebook/react
+2024-11-10T18:38:50.500Z - Fetching issue 31459 from facebook/react
+2024-11-10T18:38:50.502Z - Fetching issue 31458 from facebook/react
+2024-11-10T18:38:50.504Z - Fetching issue 31457 from facebook/react
+2024-11-10T18:38:50.506Z - Fetching issue 31456 from facebook/react
+2024-11-10T18:38:50.507Z - Fetching issue 31455 from facebook/react
+2024-11-10T18:38:50.510Z - Fetching issue 31453 from facebook/react
+2024-11-10T18:38:50.512Z - Fetching issue 31452 from facebook/react
+2024-11-10T18:38:50.513Z - Fetching issue 31451 from facebook/react
+2024-11-10T18:38:50.515Z - Fetching issue 31450 from facebook/react
+2024-11-10T18:38:50.517Z - Fetching issue 31449 from facebook/react
+2024-11-10T18:38:50.518Z - Fetching issue 31448 from facebook/react
+2024-11-10T18:38:50.520Z - Fetching issue 31447 from facebook/react
+2024-11-10T18:38:50.521Z - Fetching issue 31446 from facebook/react
+2024-11-10T18:38:50.524Z - Fetching issue 31445 from facebook/react
+2024-11-10T18:38:50.526Z - Fetching issue 31444 from facebook/react
+2024-11-10T18:38:50.527Z - Fetching issue 31443 from facebook/react
+2024-11-10T18:38:50.529Z - Fetching issue 31442 from facebook/react
+2024-11-10T18:38:50.531Z - Fetching issue 31441 from facebook/react
+2024-11-10T18:38:50.533Z - Fetching issue 31440 from facebook/react
+2024-11-10T18:38:50.534Z - Fetching issue 31439 from facebook/react
+2024-11-10T18:38:50.536Z - Fetching issue 31438 from facebook/react
+2024-11-10T18:38:50.539Z - Fetching issue 31437 from facebook/react
+2024-11-10T18:38:50.540Z - Fetching issue 31436 from facebook/react
+2024-11-10T18:38:50.542Z - Fetching issue 31435 from facebook/react
+2024-11-10T18:38:50.544Z - Fetching issue 31434 from facebook/react
+2024-11-10T18:38:50.545Z - Fetching issue 31433 from facebook/react
+2024-11-10T18:38:50.547Z - Fetching issue 31432 from facebook/react
+2024-11-10T18:38:50.548Z - Fetching issue 31431 from facebook/react
+2024-11-10T18:38:50.550Z - Fetching issue 31430 from facebook/react
+2024-11-10T18:38:50.552Z - Fetching issue 31429 from facebook/react
+2024-11-10T18:38:50.553Z - Fetching issue 31428 from facebook/react
+2024-11-10T18:38:50.555Z - Fetching issue 31427 from facebook/react
+2024-11-10T18:38:50.556Z - Fetching issue 31426 from facebook/react
+2024-11-10T18:38:50.558Z - Fetching issue 31425 from facebook/react
+2024-11-10T18:38:50.560Z - Fetching issue 31422 from facebook/react
+2024-11-10T18:38:50.562Z - Fetching issue 31420 from facebook/react
+2024-11-10T18:38:50.563Z - Fetching issue 31419 from facebook/react
+2024-11-10T18:38:50.565Z - Fetching issue 31418 from facebook/react
+2024-11-10T18:38:50.567Z - Fetching issue 31417 from facebook/react
+2024-11-10T18:38:50.568Z - Fetching issue 31416 from facebook/react
+2024-11-10T18:38:50.570Z - Fetching issue 31415 from facebook/react
+2024-11-10T18:38:50.571Z - Fetching issue 31414 from facebook/react
+2024-11-10T18:38:50.573Z - Fetching issue 31413 from facebook/react
+2024-11-10T18:38:50.575Z - Fetching issue 31412 from facebook/react
+2024-11-10T18:38:50.576Z - Fetching issue 31411 from facebook/react
+2024-11-10T18:38:50.578Z - Fetching issue 31410 from facebook/react
+2024-11-10T18:38:50.580Z - Fetching issue 31409 from facebook/react
+2024-11-10T18:38:50.581Z - Fetching issue 31408 from facebook/react
+2024-11-10T18:38:50.583Z - Fetching issue 31407 from facebook/react
+2024-11-10T18:38:50.584Z - Fetching issue 31406 from facebook/react
+2024-11-10T18:38:50.586Z - Fetching issue 31405 from facebook/react
+2024-11-10T18:38:50.588Z - Fetching issue 31404 from facebook/react
+2024-11-10T18:38:50.589Z - Fetching issue 31403 from facebook/react
+2024-11-10T18:38:50.591Z - Fetching issue 31402 from facebook/react
+2024-11-10T18:38:50.593Z - Fetching issue 31401 from facebook/react
+2024-11-10T18:38:50.595Z - Fetching issue 31400 from facebook/react
+2024-11-10T18:38:50.597Z - Fetching issue 31399 from facebook/react
+2024-11-10T18:38:50.599Z - Fetching issue 31398 from facebook/react
+2024-11-10T18:38:50.601Z - Fetching issue 31397 from facebook/react
+2024-11-10T18:38:50.603Z - Fetching issue 31396 from facebook/react
+2024-11-10T18:38:50.605Z - Fetching issue 31395 from facebook/react
+2024-11-10T18:38:50.607Z - Fetching issue 31394 from facebook/react
+2024-11-10T18:38:50.609Z - Fetching issue 31393 from facebook/react
+2024-11-10T18:38:50.611Z - Fetching issue 31392 from facebook/react
+2024-11-10T18:38:50.613Z - Fetching issue 31391 from facebook/react
+2024-11-10T18:38:50.614Z - Fetching issue 31390 from facebook/react
+2024-11-10T18:38:50.616Z - Fetching issue 31389 from facebook/react
+2024-11-10T18:38:50.618Z - Fetching issue 31388 from facebook/react
+2024-11-10T18:38:50.619Z - Fetching issue 31387 from facebook/react
+2024-11-10T18:38:50.621Z - Fetching issue 31386 from facebook/react
+2024-11-10T18:38:50.622Z - Fetching issue 31385 from facebook/react
+2024-11-10T18:38:50.624Z - Fetching issue 31384 from facebook/react
+2024-11-10T18:38:50.625Z - Fetching issue 31383 from facebook/react
+2024-11-10T18:38:50.627Z - Fetching issue 31382 from facebook/react
+2024-11-10T18:38:50.629Z - Fetching issue 31381 from facebook/react
+2024-11-10T18:38:50.631Z - Fetching issue 31380 from facebook/react
+2024-11-10T18:38:50.632Z - Fetching issue 31379 from facebook/react
+2024-11-10T18:38:50.634Z - Fetching issue 31378 from facebook/react
+2024-11-10T18:38:50.636Z - Fetching issue 31377 from facebook/react
+2024-11-10T18:38:50.638Z - Fetching issue 31376 from facebook/react
+2024-11-10T18:38:50.639Z - Fetching issue 31375 from facebook/react
+2024-11-10T18:38:50.642Z - Fetching issue 31373 from facebook/react
+2024-11-10T18:38:50.644Z - Fetching issue 31372 from facebook/react
+2024-11-10T18:38:50.645Z - Fetching issue 31371 from facebook/react
+2024-11-10T18:38:50.647Z - Fetching issue 31370 from facebook/react
+2024-11-10T18:38:50.649Z - Fetching issue 31369 from facebook/react
+2024-11-10T18:38:50.650Z - Fetching issue 31368 from facebook/react
+2024-11-10T18:38:50.920Z - Response time for issue 31473: 0.14519582175925927 days
+2024-11-10T18:38:50.928Z - Response time for issue 31467: 1.0433672222222221 days
+2024-11-10T18:38:50.929Z - Response time for issue 31438: 0.005740740740740741 days
+2024-11-10T18:38:50.930Z - Response time for issue 31405: 0.0001273148148148148 days
+2024-11-10T18:38:50.938Z - Response time for issue 31412: 6.0054159375 days
+2024-11-10T18:38:50.941Z - Response time for issue 31456: 2.338309502314815 days
+2024-11-10T18:38:50.942Z - Response time for issue 31398: 9.213668310185184 days
+2024-11-10T18:38:50.964Z - Response time for issue 31415: 1.7325462962962963 days
+2024-11-10T18:38:50.974Z - Response time for issue 31422: 5.148159421296296 days
+2024-11-10T18:38:50.975Z - Response time for issue 31437: 0.004027777777777778 days
+2024-11-10T18:38:50.980Z - Response time for issue 31453: 2.7784719907407407 days
+2024-11-10T18:38:50.981Z - Response time for issue 31373: 0.007361111111111111 days
+2024-11-10T18:38:50.986Z - Response time for issue 31370: 1.4338773148148147 days
+2024-11-10T18:38:50.987Z - Response time for issue 31389: 0.7438541666666667 days
+2024-11-10T18:38:50.988Z - Response time for issue 31406: 8.06513875 days
+2024-11-10T18:38:51.030Z - Response time for issue 31459: 2.1875813657407406 days
+2024-11-10T18:38:51.031Z - Response time for issue 31419: 2.4490162037037035 days
+2024-11-10T18:38:51.039Z - Response time for issue 31435: 0.6379513888888889 days
+2024-11-10T18:38:51.040Z - Response time for issue 31400: 5.056446759259259 days
+2024-11-10T18:38:51.041Z - Response time for issue 31381: 1.504212962962963 days
+2024-11-10T18:38:51.042Z - Response time for issue 31463: 1.9854981597222223 days
+2024-11-10T18:38:51.043Z - Response time for issue 31382: 11.907708819444444 days
+2024-11-10T18:38:51.043Z - Response time for issue 31391: 0.8388657407407407 days
+2024-11-10T18:38:51.044Z - Response time for issue 31371: 1.1705671296296296 days
+2024-11-10T18:38:51.045Z - Response time for issue 31410: 6.268021354166667 days
+2024-11-10T18:38:51.202Z - Response time for issue 31376: 0.02277777777777778 days
+2024-11-10T18:38:51.203Z - Response time for issue 31385: 0.14748842592592593 days
+2024-11-10T18:38:51.207Z - Response time for issue 31420: 0.25697916666666665 days
+2024-11-10T18:38:51.208Z - Response time for issue 31388: 11.131240833333333 days
+2024-11-10T18:38:51.209Z - Response time for issue 31428: 0.0069328703703703705 days
+2024-11-10T18:38:51.209Z - Response time for issue 31368: 0.8652430555555556 days
+2024-11-10T18:38:51.210Z - Response time for issue 31377: 9.06611111111111 days
+2024-11-10T18:38:51.211Z - Response time for issue 31448: 3.1489260532407406 days
+2024-11-10T18:38:51.212Z - Response time for issue 31408: 0.33047453703703705 days
+2024-11-10T18:38:51.213Z - Response time for issue 31387: 0.05603009259259259 days
+2024-11-10T18:38:51.213Z - Response time for issue 31375: 13.314852002314815 days
+2024-11-10T18:38:51.214Z - Response time for issue 31466: 1.759724699074074 days
+2024-11-10T18:38:51.215Z - Response time for issue 31416: 5.873393692129629 days
+2024-11-10T18:38:51.216Z - Response time for issue 31432: 0.001388888888888889 days
+2024-11-10T18:38:51.217Z - Response time for issue 31425: 0.16159722222222223 days
+2024-11-10T18:38:51.250Z - Response time for issue 31426: 1.9083564814814815 days
+2024-11-10T18:38:51.251Z - Response time for issue 31383: 0.1451388888888889 days
+2024-11-10T18:38:51.252Z - Response time for issue 31455: 2.4146556944444444 days
+2024-11-10T18:38:51.253Z - Response time for issue 31378: 9.069733796296296 days
+2024-11-10T18:38:51.254Z - Response time for issue 31372: 0.12657407407407406 days
+2024-11-10T18:38:51.255Z - Response time for issue 31390: 0.7670601851851852 days
+2024-11-10T18:38:51.255Z - Response time for issue 31386: 11.63898443287037 days
+2024-11-10T18:38:51.256Z - Response time for issue 31384: 0.14526620370370372 days
+2024-11-10T18:38:51.257Z - Response time for issue 31380: 12.50771130787037 days
+2024-11-10T18:38:51.258Z - Response time for issue 31431: 0.011909722222222223 days
+2024-11-10T18:38:51.271Z - Response time for issue 31407: 8.051102662037037 days
+2024-11-10T18:38:51.272Z - Response time for issue 31379: 2.869537037037037 days
+2024-11-10T18:38:51.276Z - Response time for issue 31392: 2.0975810185185186 days
+2024-11-10T18:38:51.277Z - Response time for issue 31470: 0.6437300578703704 days
+2024-11-10T18:38:51.278Z - Response time for issue 31404: 2.7297453703703702 days
+2024-11-10T18:38:51.278Z - Response time for issue 31472: 0.18982960648148148 days
+2024-11-10T18:38:51.279Z - Response time for issue 31401: 9.029112025462963 days
+2024-11-10T18:38:51.280Z - Response time for issue 31417: 5.832966203703704 days
+2024-11-10T18:38:51.282Z - Response time for issue 31458: 2.197190763888889 days
+2024-11-10T18:38:51.282Z - Response time for issue 31436: 4.301970856481481 days
+2024-11-10T18:38:51.283Z - Response time for issue 31445: 3.570153738425926 days
+2024-11-10T18:38:51.284Z - Response time for issue 31409: 4.126157407407407 days
+2024-11-10T18:38:51.303Z - Response time for issue 31450: 0.20078703703703704 days
+2024-11-10T18:38:51.304Z - Response time for issue 31395: 9.410015092592593 days
+2024-11-10T18:38:51.331Z - Response time for issue 31394: 9.948557071759259 days
+2024-11-10T18:38:51.332Z - Response time for issue 31414: 1.7358449074074074 days
+2024-11-10T18:38:51.333Z - Response time for issue 31439: 0.8705902777777778 days
+2024-11-10T18:38:51.335Z - Response time for issue 31402: 8.872665902777777 days
+2024-11-10T18:38:51.336Z - Response time for issue 31449: 0.20266203703703703 days
+2024-11-10T18:38:51.337Z - Response time for issue 31461: 1.5569444444444445 days
+2024-11-10T18:38:51.337Z - Response time for issue 31452: 0.8000462962962963 days
+2024-11-10T18:38:51.338Z - Response time for issue 31444: 3.573499282407407 days
+2024-11-10T18:38:51.340Z - Response time for issue 31399: 9.169598842592592 days
+2024-11-10T18:38:51.343Z - Response time for issue 31393: 10.446925266203703 days
+2024-11-10T18:38:51.344Z - Response time for issue 31433: 0.7218402777777778 days
+2024-11-10T18:38:51.345Z - Response time for issue 31457: 2.229934537037037 days
+2024-11-10T18:38:51.346Z - Response time for issue 31427: 0.09913194444444444 days
+2024-11-10T18:38:51.346Z - Response time for issue 31464: 0.19777777777777777 days
+2024-11-10T18:38:51.348Z - Response time for issue 31396: 9.241635960648148 days
+2024-11-10T18:38:51.348Z - Response time for issue 31430: 0.0035416666666666665 days
+2024-11-10T18:38:51.352Z - Response time for issue 31434: 4.8579091666666665 days
+2024-11-10T18:38:51.354Z - Response time for issue 31440: 0.0028819444444444444 days
+2024-11-10T18:38:51.365Z - Response time for issue 31413: 0.013657407407407408 days
+2024-11-10T18:38:51.366Z - Response time for issue 31462: 2.043117662037037 days
+2024-11-10T18:38:51.369Z - Response time for issue 31446: 3.4045991782407405 days
+2024-11-10T18:38:51.372Z - Response time for issue 31441: 0.002662037037037037 days
+2024-11-10T18:38:51.388Z - Response time for issue 31442: 0.002523148148148148 days
+2024-11-10T18:38:51.389Z - Response time for issue 31418: 5.6867406134259255 days
+2024-11-10T18:38:51.391Z - Response time for issue 31403: 0.003946759259259259 days
+2024-11-10T18:38:51.392Z - Response time for issue 31411: 6.210687407407407 days
+2024-11-10T18:38:51.400Z - Response time for issue 31397: 9.21532869212963 days
+2024-11-10T18:38:51.401Z - Response time for issue 31469: 0.6591365856481481 days
+2024-11-10T18:38:51.403Z - Response time for issue 31447: 3.2351088310185183 days
+2024-11-10T18:38:51.404Z - Response time for issue 31465: 1.0058912037037038 days
+2024-11-10T18:38:51.406Z - Response time for issue 31451: 0.007662037037037037 days
+2024-11-10T18:38:51.433Z - Response time for issue 31443: 0.026064814814814815 days
+2024-11-10T18:38:51.466Z - Response time for issue 31429: 0.07474537037037036 days
+2024-11-10T18:38:51.467Z - Response time for issue 31471: 0.21794520833333333 days
+2024-11-10T18:38:51.468Z - Response time for issue 31468: 1.0427600462962963 days
+2024-11-10T18:38:51.890Z - Response time for issue 31369: 0.6634722222222222 days
+2024-11-10T18:38:51.891Z - Responsiveness for facebook/react: 0.9914836274388001
+2024-11-10T18:38:51.892Z - Responsiveness for npm package react: 0.9914836274388001
+2024-11-10T18:39:03.760Z - Repository cloned successfully to \tmp\facebook-react
+2024-11-10T18:39:03.761Z - README.md found in the cloned repository
+2024-11-10T18:39:03.762Z - README file size: 5.1923828125 KB
+2024-11-10T18:39:03.762Z - Small README. Score: 3
+2024-11-10T18:39:03.763Z - Ramp-up metric calculation completed for facebook/react. Score: 0.3, Latency: 14117.02
+2024-11-10T18:39:04.988Z - Removed cloned repository directory: \tmp\facebook-react
+2024-11-10T18:39:04.991Z - Ramp-up metric for npm package react completed. Score: 0.3, Latency: 16597.0896
+2024-11-10T18:39:04.995Z - Metrics calculated for https://www.npmjs.com/package/react: {"RampUp":0.3,"Correctness":0.8333333333333334,"BusFactor":0.03333333333333333,"BusFactorLatency":1.861,"ResponsiveMaintainer":0.9914836274388001,"ResponsiveMaintainer_Latency":3.573,"License":{"score":1,"latency":1.986},"CorrectnessLatency":2.374,"RampUp_Latency":16.597}
