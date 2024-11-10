@@ -1,0 +1,4 @@
+
+> ece-46100-project@1.0.0 build
+> tsc
+
