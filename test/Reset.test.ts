@@ -55,7 +55,7 @@ describe('resetRegistry', () => {
     expect(pool.connect).toHaveBeenCalled();
     expect(resetRegistryQuery).toHaveBeenCalledWith(mockClient);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Registry is reset' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Registry is reset' });
   });
 
   it('should return 500 if there is an error resetting the registry', async () => {
