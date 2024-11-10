@@ -9,6 +9,7 @@ import path from "path"
 import AdmZip from 'adm-zip' 
 import archiver from "archiver"; // Import archiver for zipping
 import pool from './db.js'; // Adjust the path according to your project structure
+import {processUrl} from './phase_1/cli.js'
 import {
   getPackageByIDQuery,
   insertPackageQuery,
@@ -219,6 +220,20 @@ let adj_list=new Map<string,Set<string>>()
       } else {
         // Handle cases where URL is used for ingestion instead of Content
 
+        // I am gonna do the rating first 
+        const metrics=await processUrl(URL)
+        
+        if ((metrics?.NetScore||0)>0.5){
+
+          await insertPackageRating(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
+            ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
+            ,-1,-1,metrics?.Correctness_Latency,metrics
+            ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
+            ?.License_Latency,-1,-1,metrics?.NetScore ,metrics?.NetScore_Latency
+
+          );
+        }
+
         
 
         if(!URL.includes("github")){
@@ -264,7 +279,7 @@ let adj_list=new Map<string,Set<string>>()
         const base64Content = zipFileContent.toString('base64');
 
         await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
-        await insertPackageRating(client, id);
+        
 
 
         res.status(201).json({

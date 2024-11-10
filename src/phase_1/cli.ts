@@ -65,7 +65,7 @@ const parseUrl = (urlString: string) => {
 };
 
 // Main function for processing URLs
-const processUrl = async (url: string) => {
+export const processUrl = async (url: string) => {
     const start = performance.now();
 
     const parsedUrl = parseUrl(url);
@@ -227,8 +227,3 @@ const main = async () => { // Make main function async
     }
 };
 
-// Execute the main function
-main().catch(error => {
-    log(`Error: ${error}`, 1);
-    process.exit(1);
-});
