@@ -250,27 +250,17 @@ export const insertIntoPackageData = (
   };
 
 // Get package rating by package ID
-// export const getPackageRatingQuery = (packageID: string) => {
-//     //net score to be edited 
-//   const query = `
-//     SELECT
-//       pv.correctness,
-//       pv.responsiveness,
-//       pv.ramp_up,
-//       pv.bus_factor,
-//       pv.license_metric,
-//       -- Assuming that other metrics are also in the same table or calculated elsewhere
-//       (pv.correctness + pv.responsiveness + pv.ramp_up + pv.bus_factor + pv.license_metric) / 5 AS net_score 
-//     FROM
-//       pack_version pv
-//     WHERE
-//       pv.p_id = $1
-//     ORDER BY
-//       pv.version DESC
+export const getPackageRatingQuery = (packageID: number) => {
+    //net score to be edited 
+    const query = `
+    SELECT * 
+    FROM package_rating 
+    WHERE package_id = $1;
+`;
 
-//   `;
-//   return pool.query(query, [packageID]);
-// };
+
+  return pool.query(query, [packageID]);
+};
 
 // Search packages by regular expression
 export const searchPackagesByRegExQuery = (client:PoolClient,regex: string) => {

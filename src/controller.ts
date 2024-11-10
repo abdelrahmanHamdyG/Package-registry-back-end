@@ -19,11 +19,13 @@ import {
   insertPackageRating,
   
   getNameVersionById,
-  getLatestPackage, // New
+  getLatestPackage,
+  getPackageRatingQuery, // New
 } from './queries.js';
 
 
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
+import { error } from 'console';
 
 
 // Initialize the logger
@@ -127,7 +129,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-let adj_list=new Map<string,Set<string>>()
+let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
 
   export const uploadPackage = async (req: Request, res: Response) => {
@@ -245,12 +247,12 @@ let adj_list=new Map<string,Set<string>>()
         if(!URL.includes("github")){
           console.log("not github")
           let package_name=get_npm_package_name(URL)
+          await printingTheCost(package_name)
           
-          await get_npm_adjacency_list(package_name)
+          // await get_npm_adjacency_list(package_name)
           for (const x of adj_list){
             console.log(x)
           }
-          return 
           
         }
 
@@ -315,6 +317,7 @@ let adj_list=new Map<string,Set<string>>()
         
       await client.query('ROLLBACK');
 
+      console.error('Error in uploading package:', error);
       if ((error as any).code === '23505') {
         console.error('Error in uploading package:', error);
         res.status(409).json({ error: 'Package exists already.' });
@@ -587,6 +590,64 @@ export const updatePackage = async (req: Request, res: Response) => {
 };
 
 
+export const get_package_rating=async (req:Request,res:Response)=>{
+
+  const packageId:number = req.params.id as unknown as number;  // Extracting the path parameter
+
+  try{
+    if (!packageId){
+      res.status(400).json({error:"can't get package id "})
+    }
+
+    const metrics=await getPackageRatingQuery(packageId)  
+
+    if (metrics.rows.length==0){
+
+      res.status(404).json({error:"Package doesn't exists"})
+      return
+    }
+
+    
+    const packageRating = {
+      RampUp: metrics.rows[0].ramp_up,
+      Correctness: metrics.rows[0].correctness,
+      BusFactor: metrics.rows[0].bus_factor,
+      ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
+      LicenseScore: metrics.rows[0].license_score,
+      GoodPinningPractice: metrics.rows[0].good_pinning_practice,
+      PullRequest: metrics.rows[0].pull_request,
+      NetScore: metrics.rows[0].net_score,
+      RampUpLatency: metrics.rows[0].ramp_up_latency,
+      CorrectnessLatency: metrics.rows[0].correctness_latency,
+      BusFactorLatency: metrics.rows[0].bus_factor_latency,
+      ResponsiveMaintainerLatency:metrics.rows[0].responsive_maintainer_latency,
+      LicenseScoreLatency: metrics.rows[0].license_score_latency,
+      GoodPinningPracticeLatency: metrics.rows[0].good_pinning_practice_latency,
+      PullRequestLatency: metrics.rows[0].pull_request_latency,
+      NetScoreLatency: metrics.rows[0].net_score_latency,
+    };
+   
+
+
+
+
+    res.status(200).json(packageRating)
+
+    } catch (error) {
+
+
+      console.error('Error fetching package rating:', error);
+      if (error instanceof Error) {
+          res.status(500).json({ message: `Internal server error: ${error.message}` });
+      }
+      res.status(500).json({ message: 'Internal server error' });
+      
+  }
+  return 
+
+
+}
+
 const get_code_files=(dir:string):string[]=>{
 
     let files:string[] = [];
@@ -641,52 +702,48 @@ const debloat_file=async (dir:string)=>{
 
 
 
-
 const get_npm_adjacency_list = async (packageName: string) => {
-    const url = `https://registry.npmjs.org/${packageName}`;
+  const url = `https://registry.npmjs.org/${packageName}`;
+  console.log(url)
+  try {
+      const response = await fetch(url);
+      if (!response.ok) {
+          throw new Error(`Could not fetch data for package: ${packageName}`);
+      }
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Could not fetch data for package: ${packageName}`);
-        }
-        
-        const data = await response.json();
-        const latestVersion = data['dist-tags'].latest;
-        const dependencies = data.versions[latestVersion].dependencies || {};
+      const data = await response.json();
+      const latestVersion = data['dist-tags'].latest;
+      const dependencies = data.versions[latestVersion].dependencies || {};
+      const packageSize = data.versions[latestVersion].dist.unpackedSize;
 
-        // A    B C           B C D      
-        // A[B,C]  B[C]        C[B]
-        if (adj_list.has(packageName)) {
-            return
-        }
+      // If the package is already in the adj_list, we skip it
+      if (adj_list.has(packageName)) {
+          return;
+      }
 
-        adj_list.set(packageName, new Set<string>());
+      // Add the package to the adj_list with an empty Set of strings and num 0
+      adj_list.set(packageName, { strings: new Set<string>(), num: packageSize });
 
-        
-        for (const dependency of Object.keys(dependencies)) {
+      // Add each dependency to the strings Set
+      for (const dependency of Object.keys(dependencies)) {
+          // If the dependency is already in the adj_list, skip it
+          if (adj_list.has(dependency)) {
+              continue;
+          }
 
-            
-            if (adj_list.has(dependency)){
-              continue
-            }
+          // Add the dependency to the current package's Set
+          adj_list.get(packageName)!.strings.add(dependency);
 
-            adj_list.get(packageName)!.add(dependency);  
-
-            
-
-
-            await get_npm_adjacency_list(dependency);
-            
-        }
-    } catch (error) {
-        if (error instanceof Error) {
-            console.error(error.message);
-        }
-    }
-
-    
+          // Recursively fetch the adjacency list for the dependency
+          await get_npm_adjacency_list(dependency);
+      }
+  } catch (error) {
+      if (error instanceof Error) {
+          console.error(error.message);
+      }
+  }
 };
+
 
 const get_npm_package_name=(path:string):string=>{
 
@@ -695,19 +752,20 @@ const get_npm_package_name=(path:string):string=>{
 
 }
 
+let cost = new Map<string, number>();
 const calculate_cost=(package_name:string)=>{
+  let standaloneCost=adj_list.get(package_name)!.num
+  let totalCost=standaloneCost
+  for(const dep of adj_list.get(package_name)!.strings){
 
 
-  let size=0
-  for (const pack in adj_list.get(package_name)){
-
-      
+    calculate_cost(dep)
+    totalCost=totalCost+(cost.get(dep)||0) //sum the standalone costs of the dependencies + the cost of
+    
+  
   }
-
-
-
+  cost.set(package_name,totalCost)
 }
-
 
 const fetch_package_size = async (packageName: string): Promise<number> => {
     const url = `https://registry.npmjs.org/${packageName}`;
@@ -727,3 +785,13 @@ const fetch_package_size = async (packageName: string): Promise<number> => {
         return 0; // Return 0 if there's an error
     }
 };
+
+const printingTheCost=async (package_name:string)=>{
+  //making the adj_list
+  await get_npm_adjacency_list(package_name)
+  calculate_cost(package_name)
+  for(const pack of adj_list.keys()){
+    console.log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
+  }
+
+}
