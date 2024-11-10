@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { log } from './logging.js';
 
-// Function to calculate Bus Factor for GitHub URLs
+// Function to calculate Bus Factor (HHI) for GitHub URLs
 export const calculateBusFactor = async (owner: string, repo: string, githubToken: string): Promise<{ busFactor: number; latency: number }> => {
     const start = performance.now(); // Record start time
     try {
@@ -14,12 +14,20 @@ export const calculateBusFactor = async (owner: string, repo: string, githubToke
 
         const contributors = response.data;
         const contributorCount = contributors.length;
+        const totalCommits = contributors.reduce((total: number, contributor: { contributions: any; }) => total + contributor.contributions, 0);
 
         log(`Found ${contributorCount} contributors for ${owner}/${repo}`, 2); // Debug
 
-        // Calculate Bus Factor
-        const busFactor = contributorCount > 0 ? 1 / contributorCount : 0;
-        log(`Calculated Bus Factor for ${owner}/${repo}: ${busFactor}`, 1);
+        // Calculate HHI-based Bus Factor
+        let hhi = 0;
+        contributors.forEach((contributor: { login: any; contributions: number }) => {
+            const proportion = contributor.contributions / totalCommits;
+            hhi += proportion * proportion; // Squaring the proportion and adding it to the HHI
+        });
+
+        const busFactor =  Math.max(0, 1 - hhi);
+
+        log(`Calculated Bus Factor (HHI) for ${owner}/${repo}: ${busFactor}`, 1);
 
         const end = performance.now(); // Record end time
         const latency = end - start; // Calculate latency

@@ -53,7 +53,7 @@ export const resetRegistry = async (req: Request, res: Response) => {
   const client = await pool.connect();
   try {
     await resetRegistryQuery(client);
-    res.status(200).json({message:'Registry is reset'});
+    res.status(200).json({error:'Registry is reset'});
   }
   catch (error) {
     console.error('Error in reseting the registry:', error);
@@ -128,6 +128,8 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   }
 };
 let adj_list=new Map<string,Set<string>>()
+
+
   export const uploadPackage = async (req: Request, res: Response) => {
     const { Name, Content, JSProgram, debloat, URL } = req.body;
     console.log(`Name is ${Name}`)
@@ -222,17 +224,21 @@ let adj_list=new Map<string,Set<string>>()
 
         // I am gonna do the rating first 
         const metrics=await processUrl(URL)
-        
-        if ((metrics?.NetScore||0)>0.5){
+        console.log(metrics)
+        if ((metrics?.NetScore||0)<0.5){
 
-          await insertPackageRating(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
-            ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
-            ,-1,-1,metrics?.Correctness_Latency,metrics
-            ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
-            ?.License_Latency,-1,-1,metrics?.NetScore ,metrics?.NetScore_Latency
-
-          );
+          res.status(424).json({"error":"disqualified package"})
+          return 
         }
+
+        
+        await insertPackageRating(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
+          ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
+          ,-1,metrics?.CodeReview,metrics?.Correctness_Latency,metrics
+          ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
+          ?.License_Latency,-1,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
+
+        );
 
         
 
@@ -305,9 +311,18 @@ let adj_list=new Map<string,Set<string>>()
 
       }
     } catch (error) {
+      
+        
       await client.query('ROLLBACK');
-      console.error('Error in uploading package:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+
+      if ((error as any).code === '23505') {
+        console.error('Error in uploading package:', error);
+        res.status(409).json({ error: 'Package exists already.' });
+      } else {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+
+
     } finally {
       client.release();
       
@@ -640,7 +655,8 @@ const get_npm_adjacency_list = async (packageName: string) => {
         const latestVersion = data['dist-tags'].latest;
         const dependencies = data.versions[latestVersion].dependencies || {};
 
-        
+        // A    B C           B C D      
+        // A[B,C]  B[C]        C[B]
         if (adj_list.has(packageName)) {
             return
         }
@@ -649,7 +665,15 @@ const get_npm_adjacency_list = async (packageName: string) => {
 
         
         for (const dependency of Object.keys(dependencies)) {
+
+            
+            if (adj_list.has(dependency)){
+              continue
+            }
+
             adj_list.get(packageName)!.add(dependency);  
+
+            
 
 
             await get_npm_adjacency_list(dependency);

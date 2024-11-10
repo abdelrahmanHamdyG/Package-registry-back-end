@@ -79,14 +79,20 @@ export const processUrl = async (url: string) => {
     let responsivenessLatency = 0;
     let busFactor: number;
     let BusFactorLatency: number;
+    let dependency:number;
+    let dependencyLatency:number;
+    let codeReview: number;
+    let codeReviewLatency: number;
 
     if (parsedUrl.type === 'npm') {
-        const [correctnessResult, licenseResult, responsivenessResult, rampUpResult, busFactorResult] = await Promise.all([
+        const [correctnessResult, licenseResult, responsivenessResult, rampUpResult, busFactorResult,dependencyMetric,codeReviewResult] = await Promise.all([
             runWorker('./dist/phase_1/workers/correctnessWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
             runWorker('./dist/phase_1/workers/licenseWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
             runWorker('./dist/phase_1/workers/responsivenessWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
             runWorker('./dist/phase_1/workers/rampUpWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
             runWorker('./dist/phase_1/workers/busFactorWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
+            runWorker('./dist/phase_1/workers/dependencyWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
+            runWorker('./dist/phase_1/workers/codeReviewWorker.js', { type: 'npm', packageName: parsedUrl.packageName }),
         ]);
 
         console.log("we are her after the first workers")
@@ -100,14 +106,20 @@ export const processUrl = async (url: string) => {
         responsivenessLatency = responsivenessResult.latency;
         busFactor = busFactorResult.data.busFactor;
         BusFactorLatency = busFactorResult.data.latency;
+        dependency=dependencyMetric.score
+        dependencyLatency=dependencyMetric.latency
+        codeReview=codeReviewResult.score
+        codeReviewLatency=codeReviewResult.latency
 
     } else if (parsedUrl.type === 'github') {
-        const [correctnessResult, licenseResult, ResponsivenessResult, RampUpResult, busFactorResult] = await Promise.all([
+        const [correctnessResult, licenseResult, ResponsivenessResult, RampUpResult, busFactorResult,dependencyMetric,codeReviewResult] = await Promise.all([
             runWorker('./dist/phase_1/workers/correctnessWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
             runWorker('./dist/phase_1/workers/licenseWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
             runWorker('./dist/phase_1/workers/responsivenessWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
             runWorker('./dist/phase_1/workers/rampUpWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
             runWorker('./dist/phase_1/workers/busFactorWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
+            runWorker('./dist/phase_1/workers/dependencyWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
+            runWorker('./dist/phase_1/workers/codeReviewWorker.js', { type: 'github', owner: parsedUrl.owner, repo: parsedUrl.repo }),
         ]);
 
         correctness = correctnessResult.correctness;
@@ -120,6 +132,10 @@ export const processUrl = async (url: string) => {
         responsivenessLatency = ResponsivenessResult[1];
         busFactor = busFactorResult.data.busFactor;
         BusFactorLatency = busFactorResult.data.latency;
+        dependency=dependencyMetric.score
+        dependencyLatency=dependencyMetric.latency
+        codeReview=codeReviewResult.score
+        codeReviewLatency=codeReviewResult.latency
 
     } else {
         log(`Unknown URL format: ${url}`, 1);
@@ -137,28 +153,35 @@ export const processUrl = async (url: string) => {
         BusFactor: busFactor,
         BusFactorLatency: Math.round(BusFactorLatency ) / 1000,  // Convert to seconds and round to 3 decimal places
         ResponsiveMaintainer: responsiveness,
+        dependency:dependency,
+        CodeReview:codeReview,
         ResponsiveMaintainer_Latency: Math.round(responsivenessLatency ) / 1000,  // Convert to seconds and round
         License: { 
             score: licenseScore, 
             latency: Math.round(licenseLatency ) / 1000  // Convert to seconds and round
         },
         CorrectnessLatency: Math.round(correctness_latency ) / 1000,  // Convert to seconds and round
-        RampUp_Latency: Math.round(rampupLatency) / 1000 // Convert to seconds and round
+        RampUp_Latency: Math.round(rampupLatency) / 1000, // Convert to seconds and round
+        dependencyLatency:Math.round(dependencyLatency)/1000 ,
+        codeReviewLatency:Math.round(codeReviewLatency)/1000
+        
     };
 
     log(`Metrics calculated for ${url}: ${JSON.stringify(metrics)}`, 2); // Debug level
 
     // Calculate NetScore (weighted sum based on project requirements)
     const NetScore = (
-        0.25 * metrics.RampUp +
-        0.25 * metrics.Correctness +
-        0.2 * metrics.BusFactor +
+        0.15 * metrics.RampUp +
+        0.15 * metrics.Correctness +
+        0.1 * metrics.BusFactor +
         0.2 * metrics.ResponsiveMaintainer +
-        0.1 * metrics.License.score
+        0.1 * metrics.License.score+
+        0.1*metrics.dependency+
+        0.1 * metrics.CodeReview
     );
 
     const NetScore_Latency = Math.max(metrics.BusFactorLatency + metrics.ResponsiveMaintainer_Latency + metrics.CorrectnessLatency 
-        + metrics.RampUp_Latency + metrics.License.latency)  ;
+        + metrics.RampUp_Latency + metrics.License.latency+metrics.codeReviewLatency+metrics.dependencyLatency)  ;
 
     return {
         URL: url,
@@ -169,61 +192,15 @@ export const processUrl = async (url: string) => {
         BusFactor: metrics.BusFactor,
         ResponsiveMaintainer: metrics.ResponsiveMaintainer,
         License: metrics.License.score,
+        Dependency:metrics.dependencyLatency,
+        CodeReview:metrics.CodeReview,
         RampUp_Latency: metrics.RampUp_Latency,
         Correctness_Latency: metrics.CorrectnessLatency,
         BusFactor_Latency: metrics.BusFactorLatency,
         ResponsiveMaintainer_Latency: metrics.ResponsiveMaintainer,
         License_Latency: metrics.License.latency,
+        DependencyLatency:metrics.dependencyLatency,
+        CodeReviewLatency:metrics.codeReviewLatency
+        
     };
 };
-
-const main = async () => { // Make main function async
-    const args = process.argv.slice(2);
-
-    if (args.length < 1) {
-        console.error('Please provide a command: install, test, or the path to a URL file.');
-        process.exit(1);
-    }
-
-    const command = args[0];
-
-    if (command === 'install') {
-        // Install dependencies (npm install is handled in the run script)
-        log('Installing dependencies...', 1);
-        process.exit(0);
-    } else if (command === 'test') {
-        // Run test cases (you would invoke your test suite here)
-        log('Running tests...', 1);
-        const testCasesPassed = 20; // Dummy value
-        const totalTestCases = 20; // Dummy value
-        const coverage = 85; // Dummy value
-        console.log(`${testCasesPassed}/${totalTestCases} test cases passed. ${coverage}% line coverage achieved.`);
-        process.exit(0);
-    } else {
-        const urlFile = command;
-        console.log("we are here")
-
-        if (!fs.existsSync(urlFile)) {
-            log(`Error: File not found: ${urlFile}`, 1);
-            process.exit(1);
-        }
-        
-        const urls = fs.readFileSync(urlFile, 'utf-8').split('\n').filter(line => line.trim().length > 0);
-
-        // Wait for all promises to resolve
-        const results = await Promise.all(urls.map(url => processUrl(url)));
-
-        results.forEach(result => {
-            if (result !== null) {
-                console.log(JSON.stringify(result));
-            } else {
-                log('Error in metrics calculation with one of the URLs.', 1);
-                process.exit(1);
-            }
-            console.log('\n');
-        });
-
-        process.exit(0);
-    }
-};
-
