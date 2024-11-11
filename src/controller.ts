@@ -1,6 +1,7 @@
 // controller.ts
 import e, { Request, Response } from 'express';
 import http from "isomorphic-git/http/node/index.js";
+import axios from 'axios';
 import * as git from 'isomorphic-git'
 import fs from 'fs'
 import {minify} from 'terser'
@@ -133,7 +134,7 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
 
   export const uploadPackage = async (req: Request, res: Response) => {
-    const { Name, Content, JSProgram, debloat, URL } = req.body;
+    let { Name, Content, JSProgram, debloat, URL } = req.body;
     console.log(`Name is ${Name}`)
     console.log(`Content is ${Content}`)
     console.log(`JSPrgogg ${JSProgram}`)
@@ -253,7 +254,10 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
           for (const x of adj_list){
             console.log(x)
           }
+
           
+          URL=await get_repo_url(package_name)
+          console.log(`the got url is ${URL}`)
         }
 
         console.log("we are cloning ")
@@ -793,5 +797,21 @@ const printingTheCost=async (package_name:string)=>{
   for(const pack of adj_list.keys()){
     console.log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
   }
+
+}
+
+const get_repo_url=async(package_name:string)=>{
+
+
+  const packageResponse = await axios.get(`https://registry.npmjs.org/${package_name}`);
+  const repoUrl = packageResponse.data.repository?.url;
+
+  if (repoUrl && repoUrl.includes('github.com')) {
+      const cleanedRepoUrl = repoUrl.replace(/^git\+/, '').replace(/\.git$/, '');
+      
+      return cleanedRepoUrl
+  }
+
+  return null
 
 }
