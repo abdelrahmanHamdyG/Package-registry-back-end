@@ -5,6 +5,9 @@ import axios from 'axios';
 import * as git from 'isomorphic-git'
 import fs from 'fs'
 import {minify} from 'terser'
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
 import os, { tmpdir, version } from "os"
 import path from "path"
 import AdmZip from 'adm-zip' 
@@ -21,12 +24,15 @@ import {
   
   getNameVersionById,
   getLatestPackage,
-  getPackageRatingQuery, // New
+  getPackageRatingQuery,
+  getAllUsersWithName,
+  insertToUserToken, // New
 } from './queries.js';
 
 
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
 import { error } from 'console';
+import { Bool } from 'aws-sdk/clients/clouddirectory.js';
 
 
 // Initialize the logger
@@ -245,20 +251,20 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
         
 
-        if(!URL.includes("github")){
-          console.log("not github")
-          let package_name=get_npm_package_name(URL)
-          await printingTheCost(package_name)
+        // if(!URL.includes("github")){
+        //   console.log("not github")
+        //   let package_name=get_npm_package_name(URL)
           
-          // await get_npm_adjacency_list(package_name)
-          for (const x of adj_list){
-            console.log(x)
-          }
+          
+        //   // await get_npm_adjacency_list(package_name)
+        //   for (const x of adj_list){
+        //     console.log(x)
+        //   }
 
           
-          URL=await get_repo_url(package_name)
-          console.log(`the got url is ${URL}`)
-        }
+        //   URL=await get_repo_url(package_name)
+        //   console.log(`the got url is ${URL}`)
+        // }
 
         console.log("we are cloning ")
         const tempDir = path.join(os.tmpdir(), `repo-${id}`);
@@ -273,6 +279,26 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
             depth: 1,
         })
         console.log("we cloned successfully")
+
+
+
+        const repoSizeInBytes = getDirectorySize(tempDir);
+        const packageJsonPath = findPackageJson(tempDir);
+        if (packageJsonPath) {
+          console.log(`Found package.json at: ${packageJsonPath}`);
+
+          // Read and parse package.json to get dependencies
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+          // Extract dependencies and devDependencies
+          const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
+          const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
+          const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
+          await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
+        }
+        else{
+          console.error('error getting the dependencies');
+        }
 
         if(debloat){
 
@@ -526,7 +552,7 @@ export const updatePackage = async (req: Request, res: Response) => {
         
         await client.query('COMMIT');
       } else {
-
+        
       
 
 
@@ -790,13 +816,16 @@ const fetch_package_size = async (packageName: string): Promise<number> => {
     }
 };
 
-const printingTheCost=async (package_name:string)=>{
+const printingTheCost=async (package_name:string,flag:Bool)=>{
   //making the adj_list
-  await get_npm_adjacency_list(package_name)
+  if (!flag)
+    await get_npm_adjacency_list(package_name)
+  
   calculate_cost(package_name)
   for(const pack of adj_list.keys()){
     console.log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
   }
+  
 
 }
 
@@ -815,3 +844,178 @@ const get_repo_url=async(package_name:string)=>{
   return null
 
 }
+
+const githubPackagejson= async (url: string)=>{
+  try{
+    const repoData=await fetch(url)
+    console.log(` repo data :${repoData}`)
+    const repoName=getGitHubRepoNameFromUrl(url) as string
+    
+    if(!repoData.ok){
+      throw new Error(`Could not fetch data for github url: ${url}`);
+    }
+    const findindBranch=await repoData.json()
+    console.log(`findind branch: ${findindBranch}`)
+    const sizeInKb = findindBranch.size
+    const defaultBranch= findindBranch.default_branch
+    const packagejsonURL=`url+/${defaultBranch}/package.json`
+    console.log(`the package Json URL is ${packagejsonURL}`)
+    const packagejsonResponse=await fetch(packagejsonURL)
+    if(!packagejsonResponse.ok){
+      throw new Error(`Could not fetch data for the package.json of github url: ${url}`);
+    }
+    const packagejson= await packagejsonResponse.json()
+    const dependenciesSet = new Set(Object.keys(packagejson.dependencies))
+    const devDependenciesSet = new Set(Object.keys(packagejson.devDependencies))
+    const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
+    adj_list.set(repoName, { strings: new Set<string>(), num: sizeInKb });
+    for (const dep of totaldependencies){
+      get_npm_adjacency_list(dep)
+    }
+    printingTheCost(repoName,true)
+  }
+  
+  catch (error) {
+    console.error("Error:", error);
+  }
+ 
+}
+
+const getGitHubRepoNameFromUrl = (url: string): string | null => {
+  const regex = /github\.com[\/:](.+?)\/([^\/]+)/;
+  
+  const match = url.match(regex);
+  console.log("we are heerrrr")
+  if (match) {
+      return match[2]; // Return the repository name (second capture group)
+  }
+  return null; // Return null if the URL doesn't match the pattern
+};
+
+
+
+export const trackDetails=(req:Request,res:Response)=>{
+
+  try {
+    
+    const plannedTracks = ["Access control track"];
+
+    
+    res.status(200).json({ plannedTracks });
+  } catch (error) {
+    console.error('Error in /tracks endpoint:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+
+
+
+}
+
+export const authenticate = async (req: Request, res: Response) => {
+  const { User, Secret } = req.body;
+
+  if (!User || !User.name || !Secret || !Secret.password) {
+    res.status(400).json({ error: 'Missing username or password.' });
+    return;
+  }
+
+  try {
+    const result = await getAllUsersWithName(User.name);
+    if (result.rows.length == 0) {
+      res.status(401).json({ error: 'Username is incorrect.' });
+      return;
+    }
+
+    const user = result.rows[0];
+
+    // Verify the password
+    const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
+    if (!isPasswordValid) {
+      res.status(401).json({ error: 'Password is incorrect.' });
+      return;
+    }
+
+    // Generate the JWT token
+    const token = jwt.sign(
+      { sub: user.id, isAdmin: user.is_admin }, // Payload with user ID and admin status
+      process.env.JWT_SECRET as string,        // Secret key from .env
+      { expiresIn: '10h' }                     // Token expiration time
+    );
+
+    // Calculate token expiration date
+    const expirationDate = new Date();
+    expirationDate.setHours(expirationDate.getHours() + 10); // Token valid for 10 hours
+
+    // Insert the token into the user_tokens table
+    await insertToUserToken(user.id, token, expirationDate.toISOString());
+
+    // Send the token back to the user
+    res.status(200).json({ token: `Bearer ${token}` });
+  } catch (err) {
+    console.error('Error during authentication:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+
+
+
+const costOfGithubUrl= async (url:string, sizeInB: number,totaldependencies: Set<string>)=>{
+  try{
+   
+    const repoName=getGitHubRepoNameFromUrl(url) as string
+    adj_list.set(repoName, { strings: new Set<string>(), num: sizeInB });
+    for (const dep of totaldependencies){
+      get_npm_adjacency_list(dep)
+    }
+    printingTheCost(repoName,true)
+  }
+  
+  catch (error) {
+    console.error("Error:", error);
+  }
+  
+}
+const findPackageJson = (dir: string): string | null => {
+  const files = fs.readdirSync(dir); // Read files in the current directory
+
+  for (const file of files) {
+      const fullPath = path.join(dir, file);
+
+      // If it's a directory, recursively search inside it
+      if (fs.statSync(fullPath).isDirectory()) {
+          const result = findPackageJson(fullPath);
+          if (result) {
+              return result;
+          }
+      }
+      // If package.json is found, return its full path
+      if (file === 'package.json') {
+          return fullPath;
+      }
+  }
+
+  return null; // Return null if package.json is not found
+};
+
+const getDirectorySize = (dirPath: string): number => {
+  let totalSize = 0;
+
+  // Get all files and subdirectories in the directory
+  const files = fs.readdirSync(dirPath);
+
+  for (const file of files) {
+      const fullPath = path.join(dirPath, file);
+      const stat = fs.statSync(fullPath); // Get stats for the current file
+
+      if (stat.isDirectory()) {
+          // If it's a directory, recurse into it
+          totalSize += getDirectorySize(fullPath);
+      } else {
+          // If it's a file, add its size to the total
+          totalSize += stat.size;
+      }
+  }
+
+  return totalSize;
+};

@@ -1,5 +1,5 @@
 // queries.ts
-import { Pool, PoolClient } from 'pg';
+import { Client, Pool, PoolClient } from 'pg';
 import pool from './db.js'; // Adjust the path according to your project structure
 
 
@@ -261,6 +261,32 @@ export const getPackageRatingQuery = (packageID: number) => {
 
   return pool.query(query, [packageID]);
 };
+
+export const getAllUsersWithName=(name:string)=>{
+
+  const query=`SELECT * from user_account WHERE name= $1`
+  return pool.query(query,[name])
+
+}
+
+export const insertToUserToken = async (user_id: number, token: string, expiration: string): Promise<void> => {
+  try {
+    // SQL query to insert the token into the user_tokens table
+    const query = `
+      INSERT INTO user_tokens (user_id, token, expiration)
+      VALUES ($1, $2, $3)
+    `;
+
+    // Execute the query with the provided parameters
+    await pool.query(query, [user_id, token, expiration]);
+
+    console.log('Token successfully inserted into user_tokens table');
+  } catch (error) {
+    console.error('Error inserting token into user_tokens table:', error);
+    throw error; // Rethrow the error to handle it in the calling function
+  }
+};
+  
 
 // Search packages by regular expression
 export const searchPackagesByRegExQuery = (client:PoolClient,regex: string) => {

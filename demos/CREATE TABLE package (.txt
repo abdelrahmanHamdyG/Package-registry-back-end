@@ -17,7 +17,15 @@ CREATE TABLE package_data (
 CREATE TABLE user_account (
     id SERIAL PRIMARY KEY,
     name VARCHAR NOT NULL UNIQUE,
-    is_admin BOOLEAN NOT NULL
+    is_admin BOOLEAN NOT NULL,
+    password_hash TEXT NOT NULL
+);
+PackRegDB=> CREATE TABLE user_tokens (
+    id SERIAL PRIMARY KEY,                    -- Unique identifier for each token entry
+    user_id INTEGER REFERENCES user_account(id) ON DELETE CASCADE, -- Foreign key to user_account table
+    token TEXT NOT NULL,                      -- The JWT token string
+    expiration TIMESTAMP NOT NULL,            -- Expiration time of the token
+    interaction_count INTEGER DEFAULT 0       -- Counter for tracking API interactions
 );
 
 CREATE TABLE package_cost (
