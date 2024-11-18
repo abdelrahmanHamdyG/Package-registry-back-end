@@ -33,6 +33,7 @@ import {
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
 import { error } from 'console';
 import { Bool } from 'aws-sdk/clients/clouddirectory.js';
+import { bool } from 'aws-sdk/clients/signer.js';
 
 
 // Initialize the logger
@@ -294,7 +295,7 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
           const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
           const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
           const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
-          await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
+          // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
         }
         else{
           console.error('error getting the dependencies');
@@ -893,6 +894,91 @@ const getGitHubRepoNameFromUrl = (url: string): string | null => {
 };
 
 
+interface Payload{
+
+  sub:number,isAdmin:boolean
+}
+
+export const registerNewUser = async (req: Request, res: Response) => {
+  console.log("we are here registering")
+  const { name, password, isAdmin, groupId } = req.body;
+
+  if (!name || !password) {
+     res.status(400).json({ error: 'Missing name or password.' });
+     return
+  }
+
+  const client = await pool.connect(); // Use a client for the transaction
+
+  try {
+    await client.query('BEGIN'); // Start the transaction
+
+    // Check for the admin's authorization token
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    console.log(`the token is ${token}`)
+    if (!token) {
+       res.status(401).json({ error: 'Unauthorized: Token missing.' });
+       return
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
+    if (
+      typeof decoded !== 'object' ||
+      !(decoded as Payload).isAdmin
+    ) {
+       res.status(403).json({ error: 'Only admins can register users.' });
+       return
+    }
+
+    // Check if the user already exists
+    const existingUserQuery = 'SELECT * FROM user_account WHERE name = $1';
+    const existingUserResult = await client.query(existingUserQuery, [name]);
+
+    if (existingUserResult.rows.length > 0) {
+       res.status(409).json({ error: 'User with this name already exists.' });
+       return
+    }
+
+    // Hash the user's password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insert the new user
+    const insertUserQuery = `
+      INSERT INTO user_account (name, password_hash, is_admin)
+      VALUES ($1, $2, $3)
+      RETURNING id
+    `;
+    const userInsertResult = await client.query(insertUserQuery, [name, hashedPassword, isAdmin || false]);
+    const userId = userInsertResult.rows[0].id;
+
+    // Assign the user to the group (if groupId is provided)
+    if (groupId) {
+      const groupCheckQuery = 'SELECT * FROM user_groups WHERE id = $1';
+      const groupResult = await client.query(groupCheckQuery, [groupId]);
+
+      if (groupResult.rows.length === 0) {
+        throw new Error('Group does not exist.');
+      }
+
+      const assignGroupQuery = `
+        INSERT INTO user_group_membership (user_id, group_id)
+        VALUES ($1, $2)
+      `;
+      await client.query(assignGroupQuery, [userId, groupId]);
+    }
+
+    await client.query('COMMIT'); // Commit the transaction
+    res.status(201).json({ message: 'User registered successfully.' });
+  } catch (error) {
+    await client.query('ROLLBACK'); // Roll back the transaction
+    console.error('Error during user registration:', error);
+    res.status(500).json({ error: 'Internal server error.' });
+  } finally {
+    client.release(); // Release the client back to the pool
+  }
+};
 
 export const trackDetails=(req:Request,res:Response)=>{
 
