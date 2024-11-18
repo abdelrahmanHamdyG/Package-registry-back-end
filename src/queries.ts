@@ -268,6 +268,45 @@ export const getAllUsersWithName=(name:string)=>{
   return pool.query(query,[name])
 
 }
+export const doesGroupExist = async (groupId: string): Promise<boolean> => {
+  const query = `
+    SELECT 1 FROM user_groups
+    WHERE id = $1
+  `;
+  const result = await pool.query(query, [groupId]);
+  return result.rows.length > 0;
+};
+
+
+export const doesUserExist = async (userId: number): Promise<boolean> => {
+  const query = `
+    SELECT 1 FROM user_account
+    WHERE id = $1
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows.length > 0;
+};
+
+export const isUserAlreadyInGroup = async (
+  userId: number,
+  groupId: string
+): Promise<boolean> => {
+  const query = `
+    SELECT 1 FROM user_group_membership
+    WHERE user_id = $1 AND group_id = $2
+  `;
+  const result = await pool.query(query, [userId, groupId]);
+  return result.rows.length > 0;
+};
+
+export const insertUserToGroup = async (userId: number, groupId: string) => {
+  const query = `
+    INSERT INTO user_group_membership (user_id, group_id)
+    VALUES ($1, $2)
+  `;
+  await pool.query(query, [userId, groupId]);
+};
+
 
 export const insertToUserToken = async (user_id: number, token: string, expiration: string): Promise<void> => {
   try {
@@ -286,7 +325,27 @@ export const insertToUserToken = async (user_id: number, token: string, expirati
     throw error; // Rethrow the error to handle it in the calling function
   }
 };
-  
+
+export const insertToGroups=async(name:string)=>{
+
+  console.log(`name is ${name}`)
+  const query =`INSERT INTO user_groups (group_name)
+      VALUES ($1) RETURNING *`
+
+  return  pool.query(query,[name])
+
+}
+
+
+export const getAllGroupsWithName=async (name:string)=>{
+
+  const query=`SELECT * FROM user_groups WHERE group_name=$1`
+
+  return  pool.query(query,[name])
+
+
+
+}
 
 // Search packages by regular expression
 export const searchPackagesByRegExQuery = (client:PoolClient,regex: string) => {

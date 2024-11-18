@@ -129,6 +129,8 @@ WHERE
     expect((mockClient.query as vi.Mock).mock.calls[0][1]).toEqual([package_id,content,url,debloat,js_program]);
   });
 
+  
+
   it('insert rating for the package', async () => {
     const package_id=123;
     await insertPackageRating(mockClient,package_id);

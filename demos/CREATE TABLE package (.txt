@@ -71,6 +71,13 @@ CREATE TABLE package_history (
     action_date TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE user_groups (
+    id SERIAL PRIMARY KEY,
+    group_name VARCHAR UNIQUE NOT NULL
+);
+
+
+
 
 INSERT INTO package (Name, Github_Url) VALUES ('shebl', 'www.sheblelshebl.com');
 INSERT INTO package (Name, Github_Url) VALUES ('lion', 'www.lionellion.com');

@@ -26,7 +26,13 @@ import {
   getLatestPackage,
   getPackageRatingQuery,
   getAllUsersWithName,
-  insertToUserToken, // New
+  insertToUserToken,
+  getAllGroupsWithName,
+  insertToGroups,
+  doesGroupExist,
+  doesUserExist,
+  isUserAlreadyInGroup,
+  insertUserToGroup, // New
 } from './queries.js';
 
 
@@ -252,9 +258,9 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
         
 
-        // if(!URL.includes("github")){
-        //   console.log("not github")
-        //   let package_name=get_npm_package_name(URL)
+         if(!URL.includes("github")){
+           console.log("not github")
+           let package_name=get_npm_package_name(URL)
           
           
         //   // await get_npm_adjacency_list(package_name)
@@ -263,9 +269,9 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
         //   }
 
           
-        //   URL=await get_repo_url(package_name)
-        //   console.log(`the got url is ${URL}`)
-        // }
+          URL=await get_repo_url(package_name)
+          console.log(`the got url is ${URL}`)
+        }
 
         console.log("we are cloning ")
         const tempDir = path.join(os.tmpdir(), `repo-${id}`);
@@ -996,6 +1002,89 @@ export const trackDetails=(req:Request,res:Response)=>{
 
 
 }
+
+
+export const createGroup=async(req:Request,res:Response)=>{
+
+  const {name}=req.body;
+
+  if(!name){
+    res.status(401).json({error:"missing name"})
+    return
+  }
+
+  const results=await getAllGroupsWithName(name)
+
+  if(results.rows.length>0){
+
+    res.status(400).json({error:"this group  already exists"})
+    return 
+  }
+
+  try{
+
+  console.log(`name is ${name}`)
+  const group=await insertToGroups(name)
+
+  res.status(202).json({id:group.rows[0].id})
+
+  }catch(err){
+
+    res.status(500).json({error:"internal server error"})
+  }
+  
+}
+
+
+export const addUserToGroup=async(req:Request,res:Response)=>{
+
+  const groupId=req.params.groupid
+  const {user_id}=req.body
+  if (!groupId || !user_id) {
+     res.status(400).json({ error: "Missing group ID or user ID" });
+     return
+  }
+
+  try {
+    // Check if the group exists
+    const groupExists = await doesGroupExist(groupId);
+    if (!groupExists) {
+      
+       res.status(404).json({ error: "Group does not exist" });
+       return
+    }
+
+    // Check if the user exists
+    const userExists = await doesUserExist(user_id);
+    if (!userExists) {
+      res.status(404).json({ error: "User does not exist" });
+      return 
+    }
+
+    // Check if the user is already in the group
+    const isUserInGroup = await isUserAlreadyInGroup(user_id, groupId);
+    if (isUserInGroup) {
+       res.status(409).json({ error: "User is already in the group" });
+       return
+    }
+
+    
+    await insertUserToGroup(user_id, groupId);
+
+    res.status(201).json({ message: "User added to the group successfully" });
+  } catch (error) {
+    console.error("Error adding user to group:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+  
+
+
+
+
+
 
 export const authenticate = async (req: Request, res: Response) => {
   const { User, Secret } = req.body;
