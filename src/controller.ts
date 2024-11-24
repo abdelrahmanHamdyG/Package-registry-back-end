@@ -35,7 +35,8 @@ import {
   isUserAlreadyInGroup,
   insertUserToGroup,
   canIRead,
-  getUserGroups, // New
+  getUserGroups,
+  canISearch, // New
 } from './queries.js';
 import { exit } from 'process';
 
@@ -486,14 +487,38 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
 
   console.log(`Searching package by Regext with ${RegEx} called`)
 
+
   if (!RegEx) {
     res.status(400).json({ error: "There is missing field(s) in the PackageRegEx or it is formed improperly, or is invalid"});
     console.error("Error: There is no Regex");
     return;
   }
+
+
   const client = await pool.connect();
+
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized: Token missing.' });
+    console.error(`Unauthorized: Token missing.`)
+    return
+  }
+
   try {
 
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+
+    const canISearchFlag=await canISearch(userId)
+    
+    if (!canISearchFlag.rows[0].can_search){
+      
+      res.status(400).json({"error":"sorry you don't have access to search with this regex "})
+      console.error(`sorry you don't have access to search about package as ${userId}`)
+      return
+    }
 
     const packageMetaData = await searchPackagesByRegExQuery(client,RegEx);
 

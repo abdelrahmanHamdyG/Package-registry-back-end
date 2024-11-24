@@ -170,9 +170,36 @@ export const canIRead=async (user_id:number)=>{
 `;
 
 return await pool.query(userQuery,[user_id])
+}
 
+
+
+export const canISearch=async (user_id:number)=>{
+
+  const userQuery = `
+  SELECT can_search 
+  FROM user_account 
+  WHERE id = $1
+`;
+
+return await pool.query(userQuery,[user_id])
 
 }
+
+
+export const canIUpload=async (user_id:number)=>{
+
+  const userQuery = `
+  SELECT can_upload 
+  FROM user_account 
+  WHERE id = $1
+`;
+
+return await pool.query(userQuery,[user_id])
+
+}
+
+
 export const getNameVersionById = (client:PoolClient, packageID: number) => {
   const query = `
     SELECT 
