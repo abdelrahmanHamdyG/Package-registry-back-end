@@ -419,7 +419,8 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     return
   }
 
-
+  
+   
 
 
   const client = await pool.connect();
@@ -427,6 +428,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
+    const isAdmin=(decoded as Payload).isAdmin
     console.log(`my user Id is ${userId}`)
     
     await client.query("BEGIN");
@@ -434,7 +436,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
     const result=await canIRead(userId)    
     
-    if(result.rows.length==0){
+    if(result.rows.length==0&&!isAdmin){
 
       res.status(500).json({"error":"Internal Server erorr"})
       console.error(`no thing returned from the table for user ${userId}`)
@@ -442,7 +444,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     }
     const canIReadBool=result.rows[0]
     console.log(canIReadBool)
-    if(!canIReadBool.can_download){
+    if(!canIReadBool.can_download&&!isAdmin){
 
       res.status(400).json({"error":"sorry you don't have access to download this package "})
       console.error(`sorry you don't have access to download this package as ${userId}`)
@@ -465,13 +467,13 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     if(package_data.rows[0].group_id ){
       const userGroupResults=await getUserGroups(userId)
-      if(userGroupResults.rows.length==0){
+      if(userGroupResults.rows.length==0&&!isAdmin){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
       console.log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
-      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
+      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&!isAdmin ){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
