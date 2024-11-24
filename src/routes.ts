@@ -10,6 +10,8 @@ router.get("", (req: Request, res: Response) => {
 });
 
 
+router.get("/package/:id/rate", get_package_rating);
+
 router.post("/packages", searchPackagesByQueries);
 
 // DELETE /reset - Reset the registry
@@ -32,7 +34,6 @@ router.post("/package/:id", updatePackage);
 router.post("/package", uploadPackage);
 
 
-router.get("/package/:id/rate", get_package_rating);
 router.put("/authenticate",authenticate)
 router.get("/tracks",trackDetails)
 router.post("/register",registerNewUser)

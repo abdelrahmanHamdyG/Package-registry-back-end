@@ -516,6 +516,37 @@ export const searchPackagesByRegExQueryForAdmin = (client:PoolClient,regex: stri
   return client.query(query, [regex]);
 };
 
+export const canUserAccessPackage = async (userId: number, packageId: number): Promise<boolean> => {
+  const query = `
+    SELECT 
+      CASE
+        WHEN p.group_id IS NULL THEN true
+        WHEN p.group_id = ugm.group_id THEN true
+        ELSE false
+      END AS has_access
+    FROM 
+      package p
+    LEFT JOIN 
+      user_group_membership ugm
+    ON 
+      ugm.user_id = $1
+    WHERE 
+      p.id = $2
+  `;
+
+  try {
+    const result = await pool.query(query, [userId, packageId]);
+    if (result.rows.length > 0) {
+      return result.rows[0].has_access;
+    }
+    return false; // Package not found or user doesn't have access
+  } catch (error) {
+    console.error(`Error checking access for user ${userId} to package ${packageId}:`, error);
+    throw new Error('Failed to check package access.');
+  }
+};
+
+
 export const insertPackageRating = (
   client:PoolClient,
   packageID: number,

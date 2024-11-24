@@ -45,7 +45,8 @@ import {
   getUsersByGroupQuery,
   removeUserToken,
   updateUserGroup,
-  searchPackagesByRegExQueryForAdmin, // New
+  searchPackagesByRegExQueryForAdmin,
+  canUserAccessPackage, // New
 } from './queries.js';
 
 
@@ -825,10 +826,50 @@ export const get_package_rating=async (req:Request,res:Response)=>{
 
   const packageId:number = req.params.id as unknown as number;  
   console.log(`we are getting package rating for package id ${packageId}`)
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized: Token missing.' });
+    console.error(`Unauthorized: Token missing.`)
+    return
+  }
+
 
   try{
     if (!packageId){
       res.status(400).json({error:"can't get package id "})
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    const isAdmin=await checkIfIamAdmin(req)
+
+    const result=await canISearch(userId)    
+    
+    if(result.rows.length==0&&isAdmin!=1){
+
+      res.status(500).json({"error":"Internal Server erorr"})
+      console.error(`no thing returned from the table for user ${userId}`)
+      return
+    }
+
+    const canISearchBool=result.rows[0].can_search
+    if(!canISearchBool && isAdmin!=1){
+
+      res.status(402).json({"error":"sorry you are not allowed to get the rating "})
+      console.error(`sorry you  ${userId} are not allowed to get the rating `)
+      return
+    }
+
+
+    const same_group_id=await canUserAccessPackage(userId,packageId)
+
+    if(!same_group_id && isAdmin!=1){
+      res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
+      console.error(`sorry you are not allowed to get the rating of this package${userId}`)
+      return
+
     }
 
     const metrics=await getPackageRatingQuery(packageId)  
@@ -877,7 +918,6 @@ export const get_package_rating=async (req:Request,res:Response)=>{
       
   }
   return 
-
 
 }
 
