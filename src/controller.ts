@@ -44,7 +44,8 @@ import {
   getAllGroupsQuery,
   getUsersByGroupQuery,
   removeUserToken,
-  updateUserGroup, // New
+  updateUserGroup,
+  searchPackagesByRegExQueryForAdmin, // New
 } from './queries.js';
 
 
@@ -458,10 +459,6 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     return
   }
 
-  
-   
-
-
   const client = await pool.connect();
   try {
     
@@ -583,41 +580,78 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
-
-    const canISearchFlag=await canISearch(userId)
-
-    if (!canISearchFlag.rows[0].can_search){
+    const isAdmin=await checkIfIamAdmin(req)
+    console.log(`isAdmin: ${isAdmin}`)
+    if(isAdmin!=1){
+      const canISearchFlag=await canISearch(userId)
       
-      res.status(400).json({"error":"sorry you don't have access to search with this regex "})
-      console.error(`sorry you don't have access to search about package as ${userId}`)
-      return
+
+      if (!canISearchFlag.rows[0].can_search){
+        
+        res.status(400).json({"error":"sorry you don't have access to search with this regex "})
+        console.error(`sorry you don't have access to search about package as ${userId}`)
+        return
+      }
+
+      const userGroupResult = await getUserGroup(userId);
+      const userGroupId = userGroupResult.rows.length > 0 ? userGroupResult.rows[0].group_id : null;
+      const packageMetaData = await searchPackagesByRegExQuery(client,RegEx,userGroupId);
+
+      if(packageMetaData.rows.length===0){
+        res.status(404).json({error: "No package found under this regex "});
+        console.error(`Error: There is no package for that Regex ${RegEx}`);
+        return; 
+      }
+
+      const metadataList=[]
+      for (let i=0;i<packageMetaData.rows.length;i++){
+      
+      const packId:number = packageMetaData.rows[i].id;
+      const packName:string=packageMetaData.rows[i].name;
+      const packVersion:string=packageMetaData.rows[i].version;
+      
+        metadataList.push({
+          metadata:{
+            Name:packName,
+            Version:packVersion,
+            ID:packId
+          }
+        });
+      }
+      res.status(200).json(metadataList)
+    }else{
+
+      // he is an admin
+      console.log(`I am an admin`)
+      const packageMetaData = await searchPackagesByRegExQueryForAdmin(client,RegEx);
+
+      if(packageMetaData.rows.length===0){
+        res.status(404).json({error: "No package found under this regex "});
+        console.error(`Error: There is no package for that Regex ${RegEx}`);
+        return; 
+      }
+
+      const metadataList=[]
+      for (let i=0;i<packageMetaData.rows.length;i++){
+      
+      const packId:number = packageMetaData.rows[i].id;
+      const packName:string=packageMetaData.rows[i].name;
+      const packVersion:string=packageMetaData.rows[i].version;
+      
+        metadataList.push({
+          metadata:{
+            Name:packName,
+            Version:packVersion,
+            ID:packId
+          }
+        });
+      }
+      res.status(200).json(metadataList)
+
+
     }
 
-    const packageMetaData = await searchPackagesByRegExQuery(client,RegEx);
 
-    if(packageMetaData.rows.length===0){
-      res.status(404).json({error: "No package found under this regex "});
-      console.error(`Error: There is no package for that Regex ${RegEx}`);
-      return; 
-    }
-
-    const metadataList=[]
-    for (let i=0;i<packageMetaData.rows.length;i++){
-    
-    const packId:number = packageMetaData.rows[i].id;
-    const packName:string=packageMetaData.rows[i].name;
-    const packVersion:string=packageMetaData.rows[i].version;
-    
-      metadataList.push({
-        metadata:{
-          Name:packName,
-          Version:packVersion,
-          ID:packId
-        }
-      });
-    }
-    res.status(200).json(metadataList)
-    
   }
   catch (error) {
     console.error(`Error in searching by Regex: ${RegEx} `, error);
@@ -1083,11 +1117,11 @@ export const registerNewUser = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN'); // Start the transaction
 
-    const isAdmin=await checkIfIamAdmin(req)
+    const isAdmin2=await checkIfIamAdmin(req)
     
     
     
-    if (isAdmin==-1) {
+    if (isAdmin2==-1) {
        res.status(401).json({ error: 'Unauthorized: Token missing.' });
        console.error(`token missing for user name :${name} maybe not admin`)
        return
@@ -1095,7 +1129,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
 
     // const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
     if (
-      isAdmin!=1
+      isAdmin2!=1
     ) {
        res.status(403).json({ error: 'Only admins can register users.' });
        console.error(`you are not an admin`)

@@ -37,7 +37,6 @@ export const getUserGroup = async (userId: number) => {
 
   try {
     const result = await pool.query(query, [userId]);
-    // Map the rows to an array of group IDs
     return result
   } catch (error) {
     console.error(`Error fetching groups for user ID ${userId}:`, error);
@@ -495,13 +494,25 @@ export const getAllGroupsWithName=async (name:string)=>{
 }
 
 // Search packages by regular expression
-export const searchPackagesByRegExQuery = (client:PoolClient,regex: string) => {
+export const searchPackagesByRegExQuery = (client:PoolClient,regex: string,group_id:number) => {
   const query = `
-    SELECT
-     id, name, version from package 
-    WHERE
-     name ~* $1 
-  `;
+    SELECT id, name, version
+    FROM package
+    WHERE name ~* $1
+      AND (
+        group_id IS NULL
+        OR group_id = $2
+      )
+  `
+  return client.query(query, [regex,group_id]);
+};
+
+export const searchPackagesByRegExQueryForAdmin = (client:PoolClient,regex: string) => {
+  const query = `
+    SELECT id, name, version
+    FROM package
+    WHERE name ~* $1
+  `
   return client.query(query, [regex]);
 };
 
