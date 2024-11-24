@@ -42,7 +42,9 @@ import {
   checkGroupExists,
   checkPackageExists,
   getAllGroupsQuery,
-  getUsersByGroupQuery, // New
+  getUsersByGroupQuery,
+  removeUserToken,
+  updateUserGroup, // New
 } from './queries.js';
 
 
@@ -139,29 +141,39 @@ export const resetRegistry = async (req: Request, res: Response) => {
 
 
 
-const checkIfIamAdmin=(req:Request)=>{
+// import { Pool } from 'pg';
+// const pool = new Pool();
 
-  
+export const checkIfIamAdmin = async (req: Request)=>{
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return -1
-    // token missing
+    return -1; // Token is missing
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
-  const userId = decoded.sub;
-  const isAdmin=(decoded as Payload).isAdmin
-  if (isAdmin)
-    return 1 
-  else 
-    return 0
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as jwt.JwtPayload;
 
+    // Check if the token exists in the user_tokens table
+    const query = `SELECT * FROM user_tokens WHERE token = $1`;
+    const result = await pool.query(query, [token]);
 
+    if (result.rows.length === 0) {
+      return -1; // Token is invalid or has been logged out
+    }
 
+    // Check if the user is an admin
+    if  (decoded.isAdmin)
+        return 1
+    else
+        return 0
+  } catch (err) {
+    console.error("Token verification failed:", err);
+    return -1; // Invalid token
+  }
+};
 
-}
 
 
 
@@ -180,7 +192,6 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
     
     
-
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -456,7 +467,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
-    const isAdmin=(decoded as Payload).isAdmin
+    const isAdmin=await checkIfIamAdmin(req)
     console.log(`my user Id is ${userId}`)
     
     await client.query("BEGIN");
@@ -464,7 +475,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
     const result=await canIRead(userId)    
     
-    if(result.rows.length==0&&!isAdmin){
+    if(result.rows.length==0&&isAdmin!=1){
 
       res.status(500).json({"error":"Internal Server erorr"})
       console.error(`no thing returned from the table for user ${userId}`)
@@ -472,7 +483,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     }
     const canIReadBool=result.rows[0]
     console.log(canIReadBool)
-    if(!canIReadBool.can_download&&!isAdmin){
+    if(!canIReadBool.can_download&&isAdmin!=1){
 
       res.status(400).json({"error":"sorry you don't have access to download this package "})
       console.error(`sorry you don't have access to download this package as ${userId}`)
@@ -495,13 +506,13 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     if(package_data.rows[0].group_id ){
       const userGroupResults=await getUserGroup(userId)
-      if(userGroupResults.rows.length==0&&!isAdmin){
+      if(userGroupResults.rows.length==0&&isAdmin!=1){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
       console.log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
-      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&!isAdmin ){
+      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&isAdmin!=1 ){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
@@ -1072,20 +1083,19 @@ export const registerNewUser = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN'); // Start the transaction
 
+    const isAdmin=await checkIfIamAdmin(req)
     
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    console.log(`the token is ${token} for user ${name}`)
-    if (!token) {
+    
+    
+    if (isAdmin==-1) {
        res.status(401).json({ error: 'Unauthorized: Token missing.' });
        console.error(`token missing for user name :${name} maybe not admin`)
        return
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
+    // const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
     if (
-      typeof decoded !== 'object' ||
-      !(decoded as Payload).isAdmin
+      isAdmin!=1
     ) {
        res.status(403).json({ error: 'Only admins can register users.' });
        console.error(`you are not an admin`)
@@ -1153,16 +1163,16 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
 
     try{
 
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
+      const isAdmin=await checkIfIamAdmin(req)
       
-      if (!token) {
+      
+      if (isAdmin==-1) {
         res.status(401).json({ error: 'Unauthorized: Token missing.' });
         return
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
-      if (typeof decoded !== 'object' ||!(decoded as Payload).isAdmin    ) {
+      
+      if (isAdmin!=1 ) {
           res.status(403).json({ error: 'Only admins can assign packages to group.' });
           console.error(`you are not an admin`)
           return
@@ -1252,7 +1262,8 @@ export const createGroup=async(req:Request,res:Response)=>{
 
 export const assignUserToGroup=async(req:Request,res:Response)=>{
 
-  const groupId=req.params.groupid
+  const groupId=parseInt(req.params.groupid,10)
+  
   const {user_id}=req.body
   console.log(`we are adding ${user_id} to group ${groupId}`)
   if (!groupId || !user_id) {
@@ -1262,16 +1273,16 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 
   try {
     // Check if the group exists
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const isAdmin=await checkIfIamAdmin(req)
     
-    if (!token) {
+    
+    if (isAdmin==-1) {
       res.status(401).json({ error: 'Unauthorized: Token missing.' });
       return
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
-    if (typeof decoded !== 'object' ||!(decoded as Payload).isAdmin    ) {
+    
+    
+    if (isAdmin!=1) {
         res.status(403).json({ error: 'Only admins can assign users to group.' });
         console.error(`you are not an admin`)
         return
@@ -1292,7 +1303,14 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
     }
 
     
+    const isUserInGroup = await isUserAlreadyInGroup(user_id);
+    if (isUserInGroup) {
 
+       await updateUserGroup(user_id,groupId)
+       res.status(409).json({ message: `User assigned to a new group ${groupId}`});
+       console.log(`User ${user_id} assigned to a new group ${groupId}`)
+       return
+    }
     
     await insertUserToGroup(user_id, groupId);
 
@@ -1310,7 +1328,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 export const getAllGroups = async (req: Request, res: Response) => {
   console.log("Getting all groups available...");
 
-  const amIAdmin = checkIfIamAdmin(req);
+  const amIAdmin = await checkIfIamAdmin(req);
   if (amIAdmin === -1) {
     res.status(401).json({ error: "Token missing or invalid" });
     console.error("Token missing or invalid");
@@ -1332,6 +1350,29 @@ export const getAllGroups = async (req: Request, res: Response) => {
   }
 };
 
+
+export const logout = async (req: Request, res: Response) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(400).json({ error: 'Token is missing.' });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+
+    
+    await removeUserToken(token);
+
+    res.status(200).json({ message: 'Logged out successfully.' });
+  } catch (err) {
+    console.error('Error during logout:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
 export const getUsersByGroup=async(req:Request,res:Response)=>{
 
   console.log("we are getting user by groups ")
@@ -1347,7 +1388,7 @@ export const getUsersByGroup=async(req:Request,res:Response)=>{
 
   try{
 
-  const amIAdmin = checkIfIamAdmin(req);
+  const amIAdmin = await checkIfIamAdmin(req);
   if (amIAdmin === -1) {
     res.status(401).json({ error: "Token missing or invalid" });
     console.error("Token missing or invalid");

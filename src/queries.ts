@@ -185,7 +185,7 @@ export const getAllGroupsQuery=async()=>{
 
 }
 
-export const  Query = async (groupId: number) => {
+export const getUsersByGroupQuery = async (groupId: number) => {
   const query = `
     SELECT ua.id, ua.name, ua.is_admin, ua.can_download, ua.can_search, ua.can_upload
     FROM user_account ua
@@ -195,6 +195,18 @@ export const  Query = async (groupId: number) => {
   return pool.query(query, [groupId]);
 };
 
+
+export const removeUserToken = async (token: string) => {
+  const query = `DELETE FROM user_tokens WHERE token = $1`;
+  return pool.query(query, [token]);
+};
+
+export const  checkIfTokenExists=async(token:string)=>{
+
+  const query = `SELECT * FROM user_tokens WHERE token = $1`;
+  return pool.query(query, [token]);
+
+} 
 
 
 
@@ -388,7 +400,21 @@ export const getAllUsersWithName=(name:string)=>{
   return pool.query(query,[name])
 
 }
-export const doesGroupExist = async (groupId: string): Promise<boolean> => {
+
+export const updateUserGroup=async(user_id:number,group_id:number)=>{
+
+    const updatePackageGroupQuery = `
+    UPDATE user_group_membership
+    SET group_id = $1
+    WHERE user_id = $2
+  `;
+
+  return await pool.query(updatePackageGroupQuery,[group_id,user_id])
+
+}
+
+
+export const doesGroupExist = async (groupId: number): Promise<boolean> => {
   const query = `
     SELECT 1 FROM user_groups
     WHERE id = $1
@@ -396,7 +422,6 @@ export const doesGroupExist = async (groupId: string): Promise<boolean> => {
   const result = await pool.query(query, [groupId]);
   return result.rows.length > 0;
 };
-
 
 export const doesUserExist = async (userId: number): Promise<boolean> => {
   const query = `
@@ -409,17 +434,19 @@ export const doesUserExist = async (userId: number): Promise<boolean> => {
 
 export const isUserAlreadyInGroup = async (
   userId: number,
-  groupId: string
+
 ): Promise<boolean> => {
   const query = `
     SELECT 1 FROM user_group_membership
-    WHERE user_id = $1 AND group_id = $2
+    WHERE user_id = $1 
   `;
-  const result = await pool.query(query, [userId, groupId]);
+  const result = await pool.query(query, [userId]);
   return result.rows.length > 0;
 };
 
-export const insertUserToGroup = async (userId: number, groupId: string) => {
+
+
+export const insertUserToGroup = async (userId: number, groupId: number) => {
   const query = `
     INSERT INTO user_group_membership (user_id, group_id)
     VALUES ($1, $2)
