@@ -36,7 +36,11 @@ import {
   insertUserToGroup,
   canIRead,
   getUserGroups,
-  canISearch, // New
+  canISearch,
+  canIUpload,
+  assign_package_group,
+  checkGroupExists,
+  checkPackageExists, // New
 } from './queries.js';
 import { exit } from 'process';
 
@@ -146,10 +150,37 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
       return;
     }
 
+    
+    
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      res.status(401).json({ error: 'Unauthorized: Token missing.' });
+      console.error(`Unauthorized: Token missing.`)
+      return
+    }
+
+
     const client = await pool.connect();
 
     try {
       await client.query('BEGIN');
+
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+      const userId = decoded.sub;
+  
+      const canIUploadFlag=await canIUpload(userId)
+      
+      if(!canIUploadFlag.rows[0].can_upload){
+
+        res.status(400).json({"error":"sorry you don't have access to upload  "})
+        console.error(`sorry you don't have access to upload`)
+        return
+    
+      }
 
       // we are inserting to the package with group_id=NULL
       const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
@@ -439,6 +470,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
+      console.log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
       if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
@@ -512,7 +544,7 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
     const userId = decoded.sub;
 
     const canISearchFlag=await canISearch(userId)
-    
+
     if (!canISearchFlag.rows[0].can_search){
       
       res.status(400).json({"error":"sorry you don't have access to search with this regex "})
@@ -1082,19 +1114,53 @@ export const registerNewUser = async (req: Request, res: Response) => {
 
 
 
-export const addPackageToGroup=(req:Request,res:Response)=>{
+export const assignPackageToGroup=async(req:Request,res:Response)=>{
 
-    const groupId=req.params.groupid
-  
+    const groupId=req.params.groupid as unknown as number
+    const {package_id}=req.body
+
+
 
     try{
 
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      
+      if (!token) {
+        res.status(401).json({ error: 'Unauthorized: Token missing.' });
+        return
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
+      if (typeof decoded !== 'object' ||!(decoded as Payload).isAdmin    ) {
+          res.status(403).json({ error: 'Only admins can assign packages to group.' });
+          console.error(`you are not an admin`)
+          return
+      }
+
+      const checkGroupExistsFlag=await checkGroupExists(groupId)
+      const checkPackageExistsFlag=await checkPackageExists(package_id)
+      if(!checkGroupExistsFlag.rows.length||!checkPackageExistsFlag.rows.length){
+
+          res.status(400).json({"error":"either group or package doesn't exists"})
+          console.log(`either group ${groupId} or package ${package_id} doesn't exists`)
+          return 
+
+      }
+
+      await assign_package_group(package_id,groupId)
+      res.status(200).json({ message: "Package successfully assigned to group" });
+      console.log(`Package ${package_id} successfully assigned to ${groupId}`)
+      return 
 
 
     }catch(err){
 
-
-    }
+      console.error("Error assigning package to group:", err);
+      res.status(500).json({ error: "Internal server error" });
+      return 
+  
+    } 
 
 
 
@@ -1154,7 +1220,7 @@ export const createGroup=async(req:Request,res:Response)=>{
 }
 
 
-export const addUserToGroup=async(req:Request,res:Response)=>{
+export const assignUserToGroup=async(req:Request,res:Response)=>{
 
   const groupId=req.params.groupid
   const {user_id}=req.body
@@ -1166,6 +1232,20 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
 
   try {
     // Check if the group exists
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      res.status(401).json({ error: 'Unauthorized: Token missing.' });
+      return
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
+    if (typeof decoded !== 'object' ||!(decoded as Payload).isAdmin    ) {
+        res.status(403).json({ error: 'Only admins can assign users to group.' });
+        console.error(`you are not an admin`)
+        return
+    }
     const groupExists = await doesGroupExist(groupId);
     if (!groupExists) {
       
@@ -1181,13 +1261,7 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
       return 
     }
 
-    // Check if the user is already in the group
-    const isUserInGroup = await isUserAlreadyInGroup(user_id, groupId);
-    if (isUserInGroup) {
-       res.status(409).json({ error: "User is already in the group" });
-       console.error(`user ${user_id} is already in the groups`)
-       return
-    }
+    
 
     
     await insertUserToGroup(user_id, groupId);

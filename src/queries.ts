@@ -1,6 +1,7 @@
 // queries.ts
 import { Client, Pool, PoolClient } from 'pg';
 import pool from './db.js'; // Adjust the path according to your project structure
+import { userInfo } from 'os';
 
 
 // Get package by ID
@@ -170,6 +171,43 @@ export const canIRead=async (user_id:number)=>{
 `;
 
 return await pool.query(userQuery,[user_id])
+}
+
+
+export const assign_package_group=async (package_id:number,group_id:number)=>{
+
+
+  const updatePackageGroupQuery = `
+  UPDATE package
+  SET group_id = $1
+  WHERE id = $2
+`;
+
+return await pool.query(updatePackageGroupQuery,[group_id,package_id])
+
+
+}
+
+export const checkPackageExists=async (package_id:number)=>{
+
+  const packageCheckQuery = `
+  SELECT * FROM package
+  WHERE id = $1
+`;
+
+return await pool.query(packageCheckQuery,[package_id])
+
+}
+
+export const checkGroupExists=async (group_id:number)=>{
+
+  const groupCheckQuery = `
+  SELECT * FROM user_groups
+  WHERE id = $1
+`;
+
+return await pool.query(groupCheckQuery,[group_id])
+
 }
 
 
