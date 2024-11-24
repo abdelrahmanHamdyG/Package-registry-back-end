@@ -7,21 +7,22 @@ import fs from 'fs'
 import {minify} from 'terser'
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-
 import os, { tmpdir, version } from "os"
 import path from "path"
 import AdmZip from 'adm-zip' 
-import archiver from "archiver"; // Import archiver for zipping
-import pool from './db.js'; // Adjust the path according to your project structure
+import archiver from "archiver";
+import pool from './db.js'; 
 import {processUrl} from './phase_1/cli.js'
+import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
+import { Bool } from 'aws-sdk/clients/clouddirectory.js';
+
 import {
   getPackageByIDQuery,
   insertPackageQuery,
-  resetRegistryQuery,  // New 
+  resetRegistryQuery,  
   searchPackagesByRegExQuery,
   insertIntoPackageData,
   insertPackageRating,
-  
   getNameVersionById,
   getLatestPackage,
   getPackageRatingQuery,
@@ -36,48 +37,10 @@ import {
 } from './queries.js';
 
 
-import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from './s3.js';
-import { error } from 'console';
-import { Bool } from 'aws-sdk/clients/clouddirectory.js';
-import { bool } from 'aws-sdk/clients/signer.js';
 
 
-// Initialize the logger
 
-const zipDirectory = async (source: string, out: string) => {
-  const archive = archiver('zip', { zlib: { level: 2 } });
-  const stream = fs.createWriteStream(out);
 
-  return new Promise<void>((resolve, reject) => {
-    archive
-      .directory(source, false)
-      .on('error', err => reject(err))
-      .pipe(stream);
-
-    stream.on('close', () => resolve());
-    archive.finalize();
-  });
-};
-
-export const resetRegistry = async (req: Request, res: Response) => {
-  const isAdmin:Boolean=true;
-  if (!isAdmin) {
-    res.status(401).json({ error: "You do not have permission to reset the registry."});
-    console.error("not an admin");
-    return;
-  }
-  const client = await pool.connect();
-  try {
-    await resetRegistryQuery(client);
-    res.status(200).json({error:'Registry is reset'});
-  }
-  catch (error) {
-    console.error('Error in reseting the registry:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  } finally {
-    client.release();      
-  }
-};
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
   const queries: Array<{ Name: string; Version: string }> = req.body;
@@ -143,16 +106,35 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const resetRegistry = async (req: Request, res: Response) => {
+  const isAdmin:Boolean=true;
+  if (!isAdmin) {
+    res.status(401).json({ error: "You do not have permission to reset the registry."});
+    console.error("not an admin");
+    return;
+  }
+  const client = await pool.connect();
+  try {
+    await resetRegistryQuery(client);
+    res.status(200).json({error:'Registry is reset'});
+  }
+  catch (error) {
+    console.error('Error in reseting the registry:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  } finally {
+    client.release();      
+  }
+};
+
+
+
 let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
 
   export const uploadPackage = async (req: Request, res: Response) => {
     let { Name, Content, JSProgram, debloat, URL } = req.body;
-    console.log(`Name is ${Name}`)
-    console.log(`Content is ${Content}`)
-    console.log(`JSPrgogg ${JSProgram}`)
-    console.log(`debloat ${debloat}`)
-    console.log(`URL ${URL}`)
+    console.log(`Uploading Package ${Name} `)
 
     if ((!Content && !URL) || (Content && URL)) {
       res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
@@ -165,52 +147,57 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
     try {
       await client.query('BEGIN');
 
+      // we are inserting to the package with group_id=NULL
       const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
       const id:number = packageMetaData.rows[0].id;
-      const key = `packages/${id}.zip`; // Example key path
-      console.log(`id is ${id}`);
+      const key = `packages/${id}.zip`; 
+      console.log(`package ${Name} is with id:${id}`)
+
 
       let dependencies=new Set<string>
       if (Content) {
         
-        // now we need to deploat but first unzipping 
+        console.log(`${Name} is uploaded by Content `)
+        // it is uploaded by content
 
+        // reading the buffer writing it to the device 
         const content_as_base64=Buffer.from(Content,"base64")
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         fs.writeFileSync(zipPath, content_as_base64);
 
-
+        
 
         const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
-        console.log("Unzipped content to temporary directory.");
+        
+        
 
         if (debloat) {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
-          console.log("Debloated package contents.");
+          console.log(`we debloated the package ${Name} successfuly`)
         }
 
 
         const debloat_package_zipped_path=path.join(os.tmpdir(), `debloated-package-${id}.zip`);
         await zipDirectory(path_after_unzipping,debloat_package_zipped_path)
+        
 
         const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
         const base64FinalContent = finalZipContent.toString('base64');
-
-
-
-
-        
-        
         await uploadBase64ToS3(base64FinalContent,  key);
 
+
+        console.log(`we uploaded ${Name} to S3 `)
         
         await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
+        console.log(`we inserted ${Name} to PackageData `)
+
         await insertPackageRating(client,id);
-        
+        console.log(`we inserted ${Name} to Package Rating with default values as it is content`)
+
+
         res.status(201).json({
-          
           metadata:{
             Name:Name,
             Version:"1.0.0",
@@ -223,30 +210,33 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
         });
         console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
 
-        if (fs.existsSync(path_after_unzipping)) {
+        if (fs.existsSync(path_after_unzipping)) 
           fs.rmSync(path_after_unzipping, { recursive: true, force: true });
-        }
-        if (fs.existsSync(zipPath)) {
+
+        if (fs.existsSync(zipPath)) 
           fs.rmSync(zipPath);
-        }
-        
-        if (fs.existsSync(debloat_package_zipped_path)) {
+
+        if (fs.existsSync(debloat_package_zipped_path)) 
           fs.rmSync(debloat_package_zipped_path);
-        }
         
         await client.query('COMMIT');
-      } else {
-        // Handle cases where URL is used for ingestion instead of Content
 
-        // I am gonna do the rating first 
+      } else {
+        // the package is uploaded with URL 
+        
+        console.log(`${Name} is uploaded by URL`)
+
+        
         const metrics=await processUrl(URL)
+        console.log(`Metics Calculated for ${URL}: `)
         console.log(metrics)
         if ((metrics?.NetScore||0)<0.5){
 
           res.status(424).json({"error":"disqualified package"})
+          console.log(`Package ${Name} is disqualified`)
           return 
         }
-
+        console.log(`Package ${Name} is qualified`)
         
         await insertPackageRating(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
           ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
@@ -255,25 +245,34 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
           ?.License_Latency,-1,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
 
         );
+        console.log(`we insert the rating of Package ${Name}`)
 
         
 
          if(!URL.includes("github")){
-           console.log("not github")
+        
+           console.log(`${URL} is an NPM repo`)
+
+
            let package_name=get_npm_package_name(URL)
-          
+
+           console.log(`${URL} Package Name is ${package_name}`)
+
           
         //   // await get_npm_adjacency_list(package_name)
         //   for (const x of adj_list){
         //     console.log(x)
         //   }
-
           
           URL=await get_repo_url(package_name)
-          console.log(`the got url is ${URL}`)
+          console.log(`the github repo of the package  is ${URL} `)
+
+
+          
         }
 
-        console.log("we are cloning ")
+        console.log(`we are cloning the packge ${URL}`)
+
         const tempDir = path.join(os.tmpdir(), `repo-${id}`);
         fs.mkdirSync(tempDir, { recursive: true });
 
@@ -285,14 +284,13 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
             singleBranch: true,
             depth: 1,
         })
-        console.log("we cloned successfully")
+        console.log(`we cloned ${URL} successfully`)
 
 
-
-        const repoSizeInBytes = getDirectorySize(tempDir);
+        // const repoSizeInBytes = getDirectorySize(tempDir);
         const packageJsonPath = findPackageJson(tempDir);
         if (packageJsonPath) {
-          console.log(`Found package.json at: ${packageJsonPath}`);
+          // console.log(`Found package.json at: ${packageJsonPath}`);
 
           // Read and parse package.json to get dependencies
           const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -300,7 +298,7 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
           // Extract dependencies and devDependencies
           const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
           const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
-          const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
+          // const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
           // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
         }
         else{
@@ -311,20 +309,22 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
           await debloat_file(tempDir)
         }
-
-
+        
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         await zipDirectory(tempDir, zipPath);
         console.log(`Zipped repository to ${zipPath}`);
         const fileStream = fs.createReadStream(zipPath);
+
+
         uploadZipToS3(key,fileStream,'application/zip')
+        console.log(`we uploaded ${URL} to S3 Successfully `)
 
 
         const zipFileContent = fs.readFileSync(zipPath);
         const base64Content = zipFileContent.toString('base64');
 
         await insertIntoPackageData(client, id, '', URL, debloat, JSProgram);
-        
+        console.log(`we inserted ${URL} to PackageData Successfully `)
 
 
         res.status(201).json({
@@ -341,12 +341,12 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
         });
 
         await client.query('COMMIT');
-        if (fs.existsSync(tempDir)) {
+        if (fs.existsSync(tempDir)) 
           fs.rmSync(tempDir, { recursive: true, force: true });
-        }
-        if (fs.existsSync(zipPath)) {
+        
+        if (fs.existsSync(zipPath)) 
           fs.rmSync(zipPath);
-        }
+        
 
       }
     } catch (error) {
@@ -354,7 +354,7 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
         
       await client.query('ROLLBACK');
 
-      console.error('Error in uploading package:', error);
+      console.error(`Error in uploading package: ${Name}`, error);
       if ((error as any).code === '23505') {
         console.error('Error in uploading package:', error);
         res.status(409).json({ error: 'Package exists already.' });
@@ -372,29 +372,32 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 export const getPackageByID = async (req: Request, res: Response)=> {
 
   const id =Number(req.params.id)
-  console.log(`id from get Package by id is ${id}`);
+  console.log(`getPackageByID called with ${id}`);
 
   const client = await pool.connect();
   try {
-    console.log("we are inside try")
+    
     await client.query("BEGIN");
-    console.log("after beging")
+    
 
     const package_data = await getPackageByIDQuery(client, id);
 
+
     if (package_data.rows.length === 0) {
-      console.error("Package doesn't exist");
+      console.error(`Package with id:${id} doesn't exist`);
       await client.query("ROLLBACK");
        res.status(404).json({ error: "Package doesn't exist" });
        return;
     }
 
     const current_data = package_data.rows[0];
+    console.log(`we found the package with id:${id}`)
 
     // Read from S3
     const key = `packages/${id}.zip`;
     const zipFileContent = await downloadFromS3(key);
-    console.log(`Downloaded package from S3 for id: ${id}`);
+    console.log(`Downloaded package successfully from S3 for id: ${id}`);
+    
 
     await client.query("COMMIT");
 
@@ -414,7 +417,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error('Error in getting package by ID:', err);
+    console.error(`Error in getting package by ID ${id}: `, err);
     res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     client.release();
@@ -423,6 +426,8 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
 export const searchPackageByRegex = async (req: Request, res: Response) => {
   const { RegEx } = req.body;
+
+  console.log(`Searching package by Regext with ${RegEx} called`)
 
   if (!RegEx) {
     res.status(400).json({ error: "There is missing field(s) in the PackageRegEx or it is formed improperly, or is invalid"});
@@ -436,8 +441,8 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
     const packageMetaData = await searchPackagesByRegExQuery(client,RegEx);
 
     if(packageMetaData.rows.length===0){
-      res.status(404).json({error: "No package found under this regex"});
-      console.error("Error: There is no package for that Regex");
+      res.status(404).json({error: "No package found under this regex "});
+      console.error(`Error: There is no package for that Regex ${RegEx}`);
       return; 
     }
 
@@ -460,7 +465,7 @@ export const searchPackageByRegex = async (req: Request, res: Response) => {
     
   }
   catch (error) {
-    console.error('Error in searching by Regex:', error);
+    console.error(`Error in searching by Regex: ${RegEx} `, error);
     res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     client.release();      
@@ -629,7 +634,8 @@ export const updatePackage = async (req: Request, res: Response) => {
 
 export const get_package_rating=async (req:Request,res:Response)=>{
 
-  const packageId:number = req.params.id as unknown as number;  // Extracting the path parameter
+  const packageId:number = req.params.id as unknown as number;  
+  console.log(`we are getting package rating for package id ${packageId}`)
 
   try{
     if (!packageId){
@@ -641,6 +647,7 @@ export const get_package_rating=async (req:Request,res:Response)=>{
     if (metrics.rows.length==0){
 
       res.status(404).json({error:"Package doesn't exists"})
+      console.error(`package doesn't exist with id ${packageId}`)
       return
     }
 
@@ -729,9 +736,8 @@ const debloat_file=async (dir:string)=>{
     try {
       const minified = await minify(code);
       fs.writeFileSync(filePath, minified.code || code); // Fallback to original if minification fails
-      console.log(`Minified ${filePath}`);
     } catch (error) {
-      console.error(`Error minifying ${filePath}:`, error);
+      // console.error(`Error minifying ${filePath}:`, error);
     }
   }
 }
@@ -906,11 +912,14 @@ interface Payload{
 }
 
 export const registerNewUser = async (req: Request, res: Response) => {
-  console.log("we are here registering")
-  const { name, password, isAdmin, groupId } = req.body;
+  
+  const { name, password, isAdmin, groupId,canDownload=false,canSearch=false,canUpload=false } = req.body;
+  
+  console.log(`Registering new user name:${name}`)
 
   if (!name || !password) {
      res.status(400).json({ error: 'Missing name or password.' });
+     console.error(`missing name or password`)
      return
   }
 
@@ -919,12 +928,13 @@ export const registerNewUser = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN'); // Start the transaction
 
-    // Check for the admin's authorization token
+    
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    console.log(`the token is ${token}`)
+    console.log(`the token is ${token} for user ${name}`)
     if (!token) {
        res.status(401).json({ error: 'Unauthorized: Token missing.' });
+       console.error(`token missing for user name :${name} maybe not admin`)
        return
     }
 
@@ -934,6 +944,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
       !(decoded as Payload).isAdmin
     ) {
        res.status(403).json({ error: 'Only admins can register users.' });
+       console.error(`you are not an admin`)
        return
     }
 
@@ -943,6 +954,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
 
     if (existingUserResult.rows.length > 0) {
        res.status(409).json({ error: 'User with this name already exists.' });
+       console.error(`user ${name} already exists`)
        return
     }
 
@@ -952,11 +964,11 @@ export const registerNewUser = async (req: Request, res: Response) => {
 
     // Insert the new user
     const insertUserQuery = `
-      INSERT INTO user_account (name, password_hash, is_admin)
-      VALUES ($1, $2, $3)
+      INSERT INTO user_account (name, password_hash, is_admin,can_download,can_search,can_upload)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
-    const userInsertResult = await client.query(insertUserQuery, [name, hashedPassword, isAdmin || false]);
+    const userInsertResult = await client.query(insertUserQuery, [name, hashedPassword, isAdmin || false,canDownload,canSearch,canUpload]);
     const userId = userInsertResult.rows[0].id;
 
     // Assign the user to the group (if groupId is provided)
@@ -985,6 +997,28 @@ export const registerNewUser = async (req: Request, res: Response) => {
     client.release(); // Release the client back to the pool
   }
 };
+
+
+
+export const addPackageToGroup=(req:Request,res:Response)=>{
+
+    const groupId=req.params.groupid
+  
+
+    try{
+
+
+
+    }catch(err){
+
+
+    }
+
+
+
+}
+
+
 
 export const trackDetails=(req:Request,res:Response)=>{
 
@@ -1018,19 +1052,21 @@ export const createGroup=async(req:Request,res:Response)=>{
   if(results.rows.length>0){
 
     res.status(400).json({error:"this group  already exists"})
+    console.error(`group with name ${name} already exists`)
     return 
   }
 
   try{
 
-  console.log(`name is ${name}`)
+  
   const group=await insertToGroups(name)
-
+  console.log(`we inserted group ${name} with id ${group.rows[0].id}`)
   res.status(202).json({id:group.rows[0].id})
 
   }catch(err){
 
     res.status(500).json({error:"internal server error"})
+    console.error(`internal server error`)
   }
   
 }
@@ -1040,6 +1076,7 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
 
   const groupId=req.params.groupid
   const {user_id}=req.body
+  console.log(`we are adding ${user_id} to group ${groupId}`)
   if (!groupId || !user_id) {
      res.status(400).json({ error: "Missing group ID or user ID" });
      return
@@ -1051,6 +1088,7 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
     if (!groupExists) {
       
        res.status(404).json({ error: "Group does not exist" });
+       console.error(`group with id ${groupId} doesn't exists`)
        return
     }
 
@@ -1065,6 +1103,7 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
     const isUserInGroup = await isUserAlreadyInGroup(user_id, groupId);
     if (isUserInGroup) {
        res.status(409).json({ error: "User is already in the group" });
+       console.error(`user ${user_id} is already in the groups`)
        return
     }
 
@@ -1072,6 +1111,7 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
     await insertUserToGroup(user_id, groupId);
 
     res.status(201).json({ message: "User added to the group successfully" });
+    console.log(`user ${user_id} is added successfully to ${groupId}`)
   } catch (error) {
     console.error("Error adding user to group:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -1088,9 +1128,11 @@ export const addUserToGroup=async(req:Request,res:Response)=>{
 
 export const authenticate = async (req: Request, res: Response) => {
   const { User, Secret } = req.body;
+  console.log(`we start authenticating with User ${User} and Secret: ${Secret}`)
 
   if (!User || !User.name || !Secret || !Secret.password) {
     res.status(400).json({ error: 'Missing username or password.' });
+    console.error(`missing user name or password`)
     return;
   }
 
@@ -1098,6 +1140,7 @@ export const authenticate = async (req: Request, res: Response) => {
     const result = await getAllUsersWithName(User.name);
     if (result.rows.length == 0) {
       res.status(401).json({ error: 'Username is incorrect.' });
+      console.error(`userName ${User} is incorret`)
       return;
     }
 
@@ -1107,6 +1150,7 @@ export const authenticate = async (req: Request, res: Response) => {
     const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
     if (!isPasswordValid) {
       res.status(401).json({ error: 'Password is incorrect.' });
+      console.error(`password for userName ${User} is incorret`)
       return;
     }
 
@@ -1123,7 +1167,7 @@ export const authenticate = async (req: Request, res: Response) => {
 
     // Insert the token into the user_tokens table
     await insertToUserToken(user.id, token, expirationDate.toISOString());
-
+    console.log(`we inserted the token`)
     // Send the token back to the user
     res.status(200).json({ token: `Bearer ${token}` });
   } catch (err) {
@@ -1193,4 +1237,24 @@ const getDirectorySize = (dirPath: string): number => {
   }
 
   return totalSize;
+};
+
+
+
+
+
+
+
+const zipDirectory = async (source: string, out: string) => {
+  const archive = archiver('zip', { zlib: { level: 2 } });
+  const stream = fs.createWriteStream(out);
+  return new Promise<void>((resolve, reject) => {
+    archive
+      .directory(source, false)
+      .on('error', err => reject(err))
+      .pipe(stream);
+
+    stream.on('close', () => resolve());
+    archive.finalize();
+  });
 };

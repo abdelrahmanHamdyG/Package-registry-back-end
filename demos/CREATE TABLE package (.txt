@@ -3,6 +3,8 @@ CREATE TABLE package (
     name VARCHAR NOT NULL,
     version VARCHAR NOT NULL,
     UNIQUE(name, version)
+    group_id INTEGER REFERENCES user_groups(id) DEFAULT NULL,
+
 );
 
 CREATE TABLE package_data (
@@ -11,14 +13,18 @@ CREATE TABLE package_data (
     url VARCHAR,
     debloat BOOLEAN,
     js_program TEXT,
-    CONSTRAINT package_data_content_or_url CHECK ((content IS NOT NULL) OR (url IS NOT NULL))
+    //                       CONSTRAINT package_data_content_or_url CHECK ((content IS NOT NULL) OR (url IS NOT NULL))
 );
 
 CREATE TABLE user_account (
     id SERIAL PRIMARY KEY,
     name VARCHAR NOT NULL UNIQUE,
     is_admin BOOLEAN NOT NULL,
-    password_hash TEXT NOT NULL
+    password_hash TEXT NOT NULL,
+    can_download BOOLEAN DEFAULT FALSE,
+    can_search BOOLEAN DEFAULT FALSE,
+    can_upload BOOLEAN DEFAULT FALSE
+
 );
 PackRegDB=> CREATE TABLE user_tokens (
     id SERIAL PRIMARY KEY,                    -- Unique identifier for each token entry
@@ -70,6 +76,15 @@ CREATE TABLE package_history (
     action VARCHAR CHECK (action IN ('CREATE', 'UPDATE', 'DOWNLOAD', 'RATE')),
     action_date TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE user_group_membership (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+    UNIQUE (user_id, group_id) -- Prevents duplicate entries for the same user and group
+);
+
+
 
 CREATE TABLE user_groups (
     id SERIAL PRIMARY KEY,

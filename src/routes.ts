@@ -39,7 +39,7 @@ router.post("/register",registerNewUser)
 
 router.post("/group",createGroup)
 router.post("/:groupid/add_user",addUserToGroup)
-
+// router.post("/:groupid/add_package",addPackageToGroup)
 
 // POST /package/byRegEx - Search packages by regular expression
  
