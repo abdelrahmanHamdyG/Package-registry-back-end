@@ -35,14 +35,16 @@ import {
   isUserAlreadyInGroup,
   insertUserToGroup,
   canIRead,
-  getUserGroups,
+  getUserGroup,
   canISearch,
   canIUpload,
   assign_package_group,
   checkGroupExists,
-  checkPackageExists, // New
+  checkPackageExists,
+  getAllGroupsQuery,
+  getUsersByGroupQuery, // New
 } from './queries.js';
-import { exit } from 'process';
+
 
 
 
@@ -134,6 +136,32 @@ export const resetRegistry = async (req: Request, res: Response) => {
     client.release();      
   }
 };
+
+
+
+const checkIfIamAdmin=(req:Request)=>{
+
+  
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return -1
+    // token missing
+  }
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+  const userId = decoded.sub;
+  const isAdmin=(decoded as Payload).isAdmin
+  if (isAdmin)
+    return 1 
+  else 
+    return 0
+
+
+
+
+}
 
 
 
@@ -466,7 +494,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     
     if(package_data.rows[0].group_id ){
-      const userGroupResults=await getUserGroups(userId)
+      const userGroupResults=await getUserGroup(userId)
       if(userGroupResults.rows.length==0&&!isAdmin){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
@@ -1279,8 +1307,74 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 
   
 
+export const getAllGroups = async (req: Request, res: Response) => {
+  console.log("Getting all groups available...");
+
+  const amIAdmin = checkIfIamAdmin(req);
+  if (amIAdmin === -1) {
+    res.status(401).json({ error: "Token missing or invalid" });
+    console.error("Token missing or invalid");
+    return;
+  }
+
+  if (!amIAdmin) {
+    res.status(403).json({ error: "Forbidden: Only admins can view all groups" });
+    console.error("User is not an admin");
+    return;
+  }
+
+  try {
+    const results = await getAllGroupsQuery();
+    res.status(200).json(results.rows); // Return only the rows
+  } catch (error) {
+    console.error("Error fetching all groups:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getUsersByGroup=async(req:Request,res:Response)=>{
+
+  console.log("we are getting user by groups ")
+  const groupId=parseInt(req.params.groupid ,10)
+
+  if (!groupId){
+
+    res.status(402).json({"error":"group id missing"})
+    console.log(`group id missing`)
+    return 
+
+  }
+
+  try{
+
+  const amIAdmin = checkIfIamAdmin(req);
+  if (amIAdmin === -1) {
+    res.status(401).json({ error: "Token missing or invalid" });
+    console.error("Token missing or invalid");
+    return;
+  }
+
+  if (!amIAdmin) {
+    res.status(403).json({ error: "Forbidden: Only admins can view users by groups" });
+    console.error("User is not an admin");
+    return;
+  }
 
 
+  const results=await getUsersByGroupQuery(groupId)
+  res.status(202).json(results.rows)
+  console.log(`we got  users by Groups successfully`)
+  return 
+  }catch(err){
+
+    res.status(500).json({"error":`internal server error ${err}`})
+    console.log(`error happened while getting users by groups: ${err}`)
+
+  }
+
+
+
+}
 
 
 
@@ -1396,6 +1490,8 @@ const getDirectorySize = (dirPath: string): number => {
 
   return totalSize;
 };
+
+
 
 
 

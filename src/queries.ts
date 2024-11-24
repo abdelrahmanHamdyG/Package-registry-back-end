@@ -28,7 +28,7 @@ WHERE
   return client.query(query, [packageID]);
 };
 
-export const getUserGroups = async (userId: number) => {
+export const getUserGroup = async (userId: number) => {
   const query = `
     SELECT group_id 
     FROM user_group_membership 
@@ -172,6 +172,31 @@ export const canIRead=async (user_id:number)=>{
 
 return await pool.query(userQuery,[user_id])
 }
+
+export const getAllGroupsQuery=async()=>{
+
+
+  const getAllGroups=`
+  SELECT * FROM user_groups
+  `
+  return await pool.query(getAllGroups)
+
+
+
+}
+
+export const  Query = async (groupId: number) => {
+  const query = `
+    SELECT ua.id, ua.name, ua.is_admin, ua.can_download, ua.can_search, ua.can_upload
+    FROM user_account ua
+    INNER JOIN user_group_membership ugm ON ua.id = ugm.user_id
+    WHERE ugm.group_id = $1
+  `;
+  return pool.query(query, [groupId]);
+};
+
+
+
 
 
 export const assign_package_group=async (package_id:number,group_id:number)=>{
