@@ -547,6 +547,36 @@ export const canUserAccessPackage = async (userId: number, packageId: number): P
 };
 
 
+export const update_user_acces=async (can_download:boolean,can_search:boolean,can_upload:boolean,user_id:number)=>{
+
+  const query = `
+  UPDATE user_account
+  SET 
+    can_download = $1,
+    can_search = $2,
+    can_upload = $3
+  WHERE id = $4
+  RETURNING id, can_download, can_search, can_upload
+`;
+
+return await pool.query(query,[can_download,can_search,can_upload,user_id])
+
+
+}
+export const get_user_acces=async (user_id:number)=>{
+
+
+  const query=`
+    SELECT can_download,can_search,can_upload from user_account WHERE  id= $1`
+  
+
+
+return await pool.query(query,[user_id])
+
+
+}
+
+
 export const insertPackageRating = (
   client:PoolClient,
   packageID: number,

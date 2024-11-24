@@ -8,7 +8,7 @@ import {minify} from 'terser'
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import os, { tmpdir, version } from "os"
-import path from "path"
+import path, { parse } from "path"
 import AdmZip from 'adm-zip' 
 import archiver from "archiver";
 import pool from './db.js'; 
@@ -46,8 +46,11 @@ import {
   removeUserToken,
   updateUserGroup,
   searchPackagesByRegExQueryForAdmin,
-  canUserAccessPackage, // New
+  canUserAccessPackage,
+  update_user_acces,
+  get_user_acces, // New
 } from './queries.js';
+
 
 
 
@@ -920,6 +923,116 @@ export const get_package_rating=async (req:Request,res:Response)=>{
   return 
 
 }
+
+
+export const getUserAccess=async (req:Request,res:Response)=>{
+  const user_id=parseInt(req.params.user_id,10)
+  if (!user_id) {
+    res.status(400).json({ error: 'User ID is required and must be a valid number.' });
+    return;
+  }
+
+  try{
+  const isAdmin=await checkIfIamAdmin(req);
+    
+  if (isAdmin === -1) {
+    res.status(401).json({ error: 'Unauthorized: Token missing or invalid.' });
+    return;
+  }
+
+  if (!isAdmin) {
+    res.status(403).json({ error: 'Forbidden: Only admins can update user permissions.' });
+    return;
+  }
+
+  const result =await get_user_acces(user_id)
+
+  if(result.rows.length==0){
+
+    res.status(402).json({error:"User Not Found"})
+    console.log(`user ${user_id} not found`)
+    return 
+
+  }
+
+
+
+  res.status(202).json(result.rows)
+  console.log(`we get the acces for user ${user_id} sucessfull ` )
+  return
+  
+
+
+  }catch(error){
+
+    console.error('Error fetching package rating:', error);
+    if (error instanceof Error) {
+        res.status(500).json({ message: `Internal server error: ${error.message}` });
+    }
+    res.status(500).json({ message: 'Internal server error' });
+    return
+
+  }
+
+  
+
+
+}
+
+export const updateUserAccess = async (req: Request, res: Response) => {
+  const user_id = parseInt(req.params.user_id, 10);
+
+  const { can_download = false, can_search = false, can_upload = false } = req.body;
+
+  if (!user_id) {
+    res.status(400).json({ error: 'User ID is required and must be a valid number.' });
+    return;
+  }
+
+  if (
+    typeof can_download !== 'boolean' ||
+    typeof can_search !== 'boolean' ||
+    typeof can_upload !== 'boolean'
+  ) {
+    res.status(400).json({ error: 'At least one valid permission (can_download, can_search, can_upload) must be provided.' });
+    return;
+  }
+
+  try {
+    const isAdmin = await checkIfIamAdmin(req);
+
+    if (isAdmin === -1) {
+      res.status(401).json({ error: 'Unauthorized: Token missing or invalid.' });
+      return;
+    }
+
+    if (!isAdmin) {
+      res.status(403).json({ error: 'Forbidden: Only admins can update user permissions.' });
+      return;
+    }
+
+    try {
+      const result = await update_user_acces(can_download, can_search, can_upload, user_id);
+
+      if (result.rowCount === 0) {
+        res.status(404).json({ error: 'User not found.' });
+        return;
+      }
+
+      res.status(200).json({
+        message: 'User permissions updated successfully.',
+        user: result.rows[0],
+      });
+    } catch (err) {
+      console.error('Error updating user permissions:', err);
+      res.status(500).json({ error: 'Internal server error.' });
+    }
+  } catch (err) {
+    console.error('Error during permission update:', err);
+    res.status(401).json({ error: 'Unauthorized: Invalid or expired token.' });
+  }
+};
+
 
 const get_code_files=(dir:string):string[]=>{
 

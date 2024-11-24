@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, assignUserToGroup, assignPackageToGroup, getAllGroups, getUsersByGroup, logout} from "./controller.js";  // Ensure the correct path
+import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, assignUserToGroup, assignPackageToGroup, getAllGroups, getUsersByGroup, logout, updateUserAccess, getUserAccess} from "./controller.js";  // Ensure the correct path
 
 const router = Router();
 
@@ -11,6 +11,8 @@ router.get("", (req: Request, res: Response) => {
 
 
 router.get("/package/:id/rate", get_package_rating);
+router.post("/Access/:user_id",updateUserAccess)
+router.get("/Access/:user_id",getUserAccess)
 
 router.post("/packages", searchPackagesByQueries);
 
