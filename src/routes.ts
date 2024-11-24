@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails, registerNewUser, createGroup, addUserToGroup} from "./controller.js";  // Ensure the correct path
+import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, addUserToGroup} from "./controller.js";  // Ensure the correct path
 
 const router = Router();
 

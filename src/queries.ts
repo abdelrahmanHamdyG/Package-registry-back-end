@@ -10,6 +10,7 @@ export const getPackageByIDQuery = (client:PoolClient, packageID: number) => {
     p.id,
     p.name,
     p.version,
+    p.group_id,
     pd.debloat,
     pd.js_program,
     pd.url
@@ -25,6 +26,24 @@ WHERE
   `;
   return client.query(query, [packageID]);
 };
+
+export const getUserGroups = async (userId: number) => {
+  const query = `
+    SELECT group_id 
+    FROM user_group_membership 
+    WHERE user_id = $1
+  `;
+
+  try {
+    const result = await pool.query(query, [userId]);
+    // Map the rows to an array of group IDs
+    return result
+  } catch (error) {
+    console.error(`Error fetching groups for user ID ${userId}:`, error);
+    throw new Error('Failed to fetch user groups.');
+  }
+};
+
 
 // Get package by Name
 // export const getPackageByNameQuery = (packageName: string) => {
@@ -142,7 +161,18 @@ LIMIT 1;
   return client.query(query, [packageID]);
 };
 
+export const canIRead=async (user_id:number)=>{
 
+  const userQuery = `
+  SELECT can_download 
+  FROM user_account 
+  WHERE id = $1
+`;
+
+return await pool.query(userQuery,[user_id])
+
+
+}
 export const getNameVersionById = (client:PoolClient, packageID: number) => {
   const query = `
     SELECT 

@@ -33,8 +33,11 @@ import {
   doesGroupExist,
   doesUserExist,
   isUserAlreadyInGroup,
-  insertUserToGroup, // New
+  insertUserToGroup,
+  canIRead,
+  getUserGroups, // New
 } from './queries.js';
+import { exit } from 'process';
 
 
 
@@ -372,13 +375,49 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 export const getPackageByID = async (req: Request, res: Response)=> {
 
   const id =Number(req.params.id)
+
   console.log(`getPackageByID called with ${id}`);
+
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized: Token missing.' });
+    console.error(`Unauthorized: Token missing.`)
+    return
+  }
+
+
+
 
   const client = await pool.connect();
   try {
     
-    await client.query("BEGIN");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    console.log(`my user Id is ${userId}`)
     
+    await client.query("BEGIN");
+    // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
+
+    const result=await canIRead(userId)    
+    
+    if(result.rows.length==0){
+
+      res.status(500).json({"error":"Internal Server erorr"})
+      console.error(`no thing returned from the table for user ${userId}`)
+      return
+    }
+    const canIReadBool=result.rows[0]
+    console.log(canIReadBool)
+    if(!canIReadBool.can_download){
+
+      res.status(400).json({"error":"sorry you don't have access to download this package "})
+      console.error(`sorry you don't have access to download this package as ${userId}`)
+      return
+    }
+
+    console.log(`User ${userId} can download packages `)
 
     const package_data = await getPackageByIDQuery(client, id);
 
@@ -389,6 +428,24 @@ export const getPackageByID = async (req: Request, res: Response)=> {
        res.status(404).json({ error: "Package doesn't exist" });
        return;
     }
+
+    
+    
+    if(package_data.rows[0].group_id ){
+      const userGroupResults=await getUserGroups(userId)
+      if(userGroupResults.rows.length==0){
+        res.status(400).json({"error":"sorry you don't have access to download this package "})
+        console.error(`sorry you don't have access to download this package as ${userId}`)
+        return 
+      }
+      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
+        res.status(400).json({"error":"sorry you don't have access to download this package "})
+        console.error(`sorry you don't have access to download this package as ${userId}`)
+        return 
+      }
+
+    }
+
 
     const current_data = package_data.rows[0];
     console.log(`we found the package with id:${id}`)
