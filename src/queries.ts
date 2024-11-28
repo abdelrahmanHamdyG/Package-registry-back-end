@@ -235,6 +235,18 @@ return await pool.query(packageCheckQuery,[package_id])
 
 }
 
+export const getPackageHistoryQuery=async (package_id:number)=>{
+
+  const query=`
+
+  SELECT * from package_history where package_id=$1
+
+  `
+  return await pool.query(query,[package_id])
+
+}
+
+
 export const checkGroupExists=async (group_id:number)=>{
 
   const groupCheckQuery = `
@@ -625,3 +637,56 @@ export const insertPackageRating = (
 };
 
 
+
+export const insertToPackageHistory=async(user_id:number,action:string,package_id:number,client:PoolClient)=>{
+
+  const current_date=get_current_date()
+
+  const query=`
+  INSERT INTO package_history 
+  (package_id,user_id,action,action_date)
+  VALUES ($1,$2,$3,$4)
+  `
+
+  if(client)
+    return await client.query(query,[package_id,user_id,action,current_date])
+  else
+    return await pool.query(query,[package_id,user_id,action,current_date])
+}
+
+
+export const insertToPackageHistoryRating=async(user_id:number,action:string,package_id:number)=>{
+
+  const current_date=get_current_date()
+
+  const query=`
+  INSERT INTO package_history 
+  (package_id,user_id,action,action_date)
+  VALUES ($1,$2,$3,$4)
+  `
+
+  return await pool.query(query,[package_id,user_id,action,current_date])
+
+
+}
+
+
+const get_current_date=()=>{
+
+  const currentDateTime = new Date();
+
+  // Extract year, month, day, hour, and minute
+  const year = currentDateTime.getFullYear();
+  const month = String(currentDateTime.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+  const day = String(currentDateTime.getDate()).padStart(2, '0');
+  const hour = String(currentDateTime.getHours()).padStart(2, '0');
+  const minute = String(currentDateTime.getMinutes()).padStart(2, '0');
+    
+  // Combine them into the desired format
+  const formattedDateTime = `${year}-${month}-${day} ${hour}:${minute}`;
+
+  return formattedDateTime
+  
+  
+
+}

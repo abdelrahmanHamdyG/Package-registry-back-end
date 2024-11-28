@@ -48,8 +48,12 @@ import {
   searchPackagesByRegExQueryForAdmin,
   canUserAccessPackage,
   update_user_acces,
-  get_user_acces, // New
+  get_user_acces,
+  insertToPackageHistory,
+  insertToPackageHistoryRating,
+  getPackageHistoryQuery, // New
 } from './queries.js';
+import { Client } from 'pg';
 
 
 
@@ -298,6 +302,8 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
         if (fs.existsSync(debloat_package_zipped_path)) 
           fs.rmSync(debloat_package_zipped_path);
         
+
+        await insertToPackageHistory(userId,"CREATE",id,client)
         await client.query('COMMIT');
 
       } else {
@@ -419,6 +425,8 @@ let adj_list = new Map<string, {strings: Set<string>, num: number}>();
           }
         });
 
+
+        await insertToPackageHistory(userId,"CREATE",id,client)
         await client.query('COMMIT');
         if (fs.existsSync(tempDir)) 
           fs.rmSync(tempDir, { recursive: true, force: true });
@@ -455,19 +463,23 @@ export const getPackageByID = async (req: Request, res: Response)=> {
   console.log(`getPackageByID called with ${id}`);
 
   const authHeader = req.headers['authorization'];
+  console.log(`auth header is ${authHeader}`)
   const token = authHeader && authHeader.split(' ')[1];
+  console.log(`token  is ${authHeader}`)
 
   if (!token) {
     res.status(401).json({ error: 'Unauthorized: Token missing.' });
     console.error(`Unauthorized: Token missing.`)
     return
   }
+  
 
   const client = await pool.connect();
   try {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
+    
     const isAdmin=await checkIfIamAdmin(req)
     console.log(`my user Id is ${userId}`)
     
@@ -476,12 +488,14 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
     const result=await canIRead(userId)    
     
+    
     if(result.rows.length==0&&isAdmin!=1){
 
       res.status(500).json({"error":"Internal Server erorr"})
       console.error(`no thing returned from the table for user ${userId}`)
       return
     }
+    
     const canIReadBool=result.rows[0]
     console.log(canIReadBool)
     if(!canIReadBool.can_download&&isAdmin!=1){
@@ -491,11 +505,12 @@ export const getPackageByID = async (req: Request, res: Response)=> {
       return
     }
 
+    
     console.log(`User ${userId} can download packages `)
 
     const package_data = await getPackageByIDQuery(client, id);
 
-
+    console.log("we got the package by ID ")
     if (package_data.rows.length === 0) {
       console.error(`Package with id:${id} doesn't exist`);
       await client.query("ROLLBACK");
@@ -503,20 +518,39 @@ export const getPackageByID = async (req: Request, res: Response)=> {
        return;
     }
 
-    
+    console.log(package_data.rows[0])
     
     if(package_data.rows[0].group_id ){
+      console.log("we are here1 ")
       const userGroupResults=await getUserGroup(userId)
+      console.log(userGroupResults)
+      console.log(userGroupResults.rows[0])
+
+
       if(userGroupResults.rows.length==0&&isAdmin!=1){
         res.status(400).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
-      console.log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
-      if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&isAdmin!=1 ){
-        res.status(400).json({"error":"sorry you don't have access to download this package "})
-        console.error(`sorry you don't have access to download this package as ${userId}`)
-        return 
+      // console.log("we are here 2")
+      
+      if(isAdmin!=1){
+        
+        if(userGroupResults.rows[0].length==0&&package_data.rows[0].group_id){
+          res.status(400).json({"error":"sorry you don't have access to download this package "})
+          console.error(`sorry you don't have access to download this package as ${userId}`)
+          return 
+        }
+        
+        if(userGroupResults.rows.length>=0){
+
+            if((package_data.rows[0].group_id)&&userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
+              res.status(400).json({"error":"sorry you don't have access to download this package "})
+              console.error(`sorry you don't have access to download this package as ${userId}`)
+              return 
+            }
+
+        }
       }
 
     }
@@ -530,7 +564,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     const zipFileContent = await downloadFromS3(key);
     console.log(`Downloaded package successfully from S3 for id: ${id}`);
     
-
+    await insertToPackageHistory(userId,"DOWNLOAD",id,client)
     await client.query("COMMIT");
 
     res.status(200).json({
@@ -755,6 +789,8 @@ export const updatePackage = async (req: Request, res: Response) => {
         });
         console.log(`Package ${Name} version${Version} uploaded successfully`);
         
+
+        
         await client.query('COMMIT');
       } else {
         
@@ -824,6 +860,74 @@ export const updatePackage = async (req: Request, res: Response) => {
   }
 };
 
+
+export const getPackageHistory=async(req:Request,res:Response)=>{
+
+
+  const {id}=req.body
+
+  console.log(`we are getting package history for package ${id}`)
+
+
+  if(!id){
+    res.status(401).json({error:"id missing "})
+    console.log(`id ${id} missing`)
+    return
+  }
+
+
+  try{
+
+    const isAdmin=await checkIfIamAdmin(req)
+
+    if(isAdmin==-1){
+        res.status(402).json({error:"token not found"})
+        console.log(`token not found`)
+        return
+    }
+
+    if(isAdmin==0){
+
+      res.status(403).json({error:"Only admins are allowed to view package history"})
+      console.log(`he is not an admin`)
+      return
+    }
+
+    console.log(`you are an admin`)
+
+    const doesPackageExists=await checkPackageExists(id)
+
+    if(doesPackageExists.rows.length==0){
+
+      res.status(404).json({error:"package doesn't exists"})
+      console.log(`package with id ${id} doesn't exists`)
+      return
+    }
+
+
+  const history = await getPackageHistoryQuery(id);
+
+    if (history.rows.length === 0) {
+      res.status(405).json({ error: "No history found for the specified package" });
+      console.log(`No history found for package with ID ${id}`);
+      return;
+    }
+
+    console.log(`Returning package history for package ${id}`);
+    res.status(200).json(history.rows);
+    return
+
+  }catch(err){
+
+
+    console.log(`error in getting package ${id} history`)
+    res.status(500).json({ message: 'Internal server error' });
+    return 
+  }
+
+
+
+}
 
 export const get_package_rating=async (req:Request,res:Response)=>{
 
@@ -906,7 +1010,7 @@ export const get_package_rating=async (req:Request,res:Response)=>{
    
 
 
-
+    await insertToPackageHistoryRating(userId,"RATE",packageId)
 
     res.status(200).json(packageRating)
 
@@ -1055,9 +1159,6 @@ const get_code_files=(dir:string):string[]=>{
 
 
   }
-
-
-
 
 
 
@@ -1620,7 +1721,7 @@ export const authenticate = async (req: Request, res: Response) => {
     const result = await getAllUsersWithName(User.name);
     if (result.rows.length == 0) {
       res.status(401).json({ error: 'Username is incorrect.' });
-      console.error(`userName ${User} is incorret`)
+      console.error(`userName ${User} is incorret`) 
       return;
     }
 
@@ -1655,6 +1756,9 @@ export const authenticate = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error.' });
   }
 };
+
+
+
 
 
 
@@ -1718,14 +1822,6 @@ const getDirectorySize = (dirPath: string): number => {
 
   return totalSize;
 };
-
-
-
-
-
-
-
-
 
 const zipDirectory = async (source: string, out: string) => {
   const archive = archiver('zip', { zlib: { level: 2 } });

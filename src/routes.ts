@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, assignUserToGroup, assignPackageToGroup, getAllGroups, getUsersByGroup, logout, updateUserAccess, getUserAccess} from "./controller.js";  // Ensure the correct path
+import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, assignUserToGroup, assignPackageToGroup, getAllGroups, getUsersByGroup, logout, updateUserAccess, getUserAccess, getPackageHistory} from "./controller.js";  // Ensure the correct path
 
 const router = Router();
 
@@ -47,6 +47,8 @@ router.post("/:groupid/add_package",assignPackageToGroup)
 router.get("/groups",getAllGroups)
 router.get("/groups/:groupid",getUsersByGroup)
 router.post("/logout/",logout)
+
+router.get("/history",getPackageHistory)
 
 // POST /package/byRegEx - Search packages by regular expression
  
