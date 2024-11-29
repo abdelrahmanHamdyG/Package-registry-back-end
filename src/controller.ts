@@ -51,16 +51,9 @@ import {
   get_user_acces,
   insertToPackageHistory,
   insertToPackageHistoryRating,
-  getPackageHistoryQuery, // New
+  getPackageHistoryQuery,
 } from './queries.js';
 import { Client } from 'pg';
-
-
-
-
-
-
-
 
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
@@ -68,11 +61,50 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   const offset: number = parseInt(req.query.offset as string) || 0;
   let packages: any[] = [];
 
+
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  // check first if I can search 
+
+  if(!token){
+      res.status(401).json({error:"Token missing"})
+      console.log(`token is missing`)
+      return
+  }
+  
+  
+
+
   let queryText = 'SELECT * FROM package WHERE';
   const queryParams: (string | number)[] = [];
   const conditions: string[] = [];
 
   try {
+
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    
+
+    const isAdmin=await checkIfIamAdmin(req)
+    const canISearchFlag=await canISearch(userId)
+
+    if(canISearchFlag.rows.length==0&&isAdmin!=1){
+
+      res.status(402).json("user not found")
+      return
+    }
+
+
+    if(!canISearchFlag.rows[0].can_search){
+
+      res.status(402).json("user not allowed to search")
+      return
+
+    }
+
+
+
     for (let i = 0; i < queries.length; i++) {
       const { Name, Version } = queries[i];
 
@@ -106,6 +138,21 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
     // Combine conditions with OR
     queryText += ` ${conditions.join(' OR ')}`;
+    
+    if (!isAdmin) {
+      const userGroupResult = await getUserGroup(userId);
+
+      if (userGroupResult.rows.length === 0) {
+        res.status(403).json({ error: "User group not found" });
+        return;
+      }
+
+      const userGroupId = userGroupResult.rows[0].group_id;
+
+      // Append group conditions for non-admin users
+      queryText += ` AND (group_id = $${queryParams.length + 1} OR group_id IS NULL)`;
+      queryParams.push(userGroupId);
+    }
 
     // Add pagination with OFFSET and LIMIT for each page (let's set limit to 10 as an example)
     const limit = 10;
@@ -127,6 +174,8 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
 
 export const resetRegistry = async (req: Request, res: Response) => {
   const isAdmin:Boolean=true;
@@ -921,7 +970,7 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 
     console.log(`error in getting package ${id} history`)
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
     return 
   }
 

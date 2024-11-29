@@ -321,69 +321,6 @@ export const insertIntoPackageData = (
   ]);
 };
 
-// ------------------------------------------------------------------------------------
-// New Queries for Additional Endpoints
-// ------------------------------------------------------------------------------------
-
-// Search packages based on query
-// export const searchPackagesQuery = (packageQueries: any[], offset: number) => {
-//     // Check if the request is for enumerating all packages (name == "*")
-//     const isAllPackagesQuery = packageQueries.length === 1 && packageQueries[0].Name === "*";
-  
-//     const packageNames = packageQueries.map(query => query.Name);
-//     const packageVersions = packageQueries.map(query => query.Version);
-  
-//     let query;
-//     let queryParams;
-  
-//     if (isAllPackagesQuery) {
-//       // If the query is for all packages, don't filter by name or version
-//       query = `
-//         SELECT
-//           p.p_id,
-//           p.name,
-//           p.github_url,
-//           pv.version,
-//           pv.correctness,
-//           pv.responsiveness,
-//           pv.ramp_up,
-//           pv.bus_factor,
-//           pv.license_metric
-//         FROM
-//           package p
-//         LEFT JOIN
-//           pack_version pv ON p.p_id = pv.p_id
-//         OFFSET $1
-//       `;
-//       queryParams = [offset];
-//     } else {
-//       // If it's not a "*" query, use name and version filters
-//       query = `
-//         SELECT
-//           p.p_id,
-//           p.name,
-//           p.github_url,
-//           pv.version,
-//           pv.correctness,
-//           pv.responsiveness,
-//           pv.ramp_up,
-//           pv.bus_factor,
-//           pv.license_metric
-//         FROM
-//           package p
-//         LEFT JOIN
-//           pack_version pv ON p.p_id = pv.p_id
-//         WHERE p.name = ANY($1::text[])
-//         AND pv.version = ANY($2::text[])
-//         OFFSET $3
-//       `;
-//       queryParams = [packageNames, packageVersions, offset];
-//     }
-  
-//     return pool.query(query, queryParams);
-//   };
-  
-  
 
   export const resetRegistryQuery = (client:PoolClient) => {
     const query = `
@@ -501,8 +438,6 @@ export const getAllGroupsWithName=async (name:string)=>{
 
   return  pool.query(query,[name])
 
-
-
 }
 
 // Search packages by regular expression
@@ -572,20 +507,14 @@ export const update_user_acces=async (can_download:boolean,can_search:boolean,ca
 `;
 
 return await pool.query(query,[can_download,can_search,can_upload,user_id])
-
-
 }
+
+
 export const get_user_acces=async (user_id:number)=>{
-
-
   const query=`
     SELECT can_download,can_search,can_upload from user_account WHERE  id= $1`
   
-
-
-return await pool.query(query,[user_id])
-
-
+  return await pool.query(query,[user_id])
 }
 
 
@@ -681,12 +610,76 @@ const get_current_date=()=>{
   const day = String(currentDateTime.getDate()).padStart(2, '0');
   const hour = String(currentDateTime.getHours()).padStart(2, '0');
   const minute = String(currentDateTime.getMinutes()).padStart(2, '0');
-    
+
   // Combine them into the desired format
   const formattedDateTime = `${year}-${month}-${day} ${hour}:${minute}`;
 
   return formattedDateTime
   
-  
 
 }
+
+
+// ------------------------------------------------------------------------------------
+// New Queries for Additional Endpoints
+// ------------------------------------------------------------------------------------
+
+// Search packages based on query
+// export const searchPackagesQuery = (packageQueries: any[], offset: number) => {
+//     // Check if the request is for enumerating all packages (name == "*")
+//     const isAllPackagesQuery = packageQueries.length === 1 && packageQueries[0].Name === "*";
+  
+//     const packageNames = packageQueries.map(query => query.Name);
+//     const packageVersions = packageQueries.map(query => query.Version);
+  
+//     let query;
+//     let queryParams;
+  
+//     if (isAllPackagesQuery) {
+//       // If the query is for all packages, don't filter by name or version
+//       query = `
+//         SELECT
+//           p.p_id,
+//           p.name,
+//           p.github_url,
+//           pv.version,
+//           pv.correctness,
+//           pv.responsiveness,
+//           pv.ramp_up,
+//           pv.bus_factor,
+//           pv.license_metric
+//         FROM
+//           package p
+//         LEFT JOIN
+//           pack_version pv ON p.p_id = pv.p_id
+//         OFFSET $1
+//       `;
+//       queryParams = [offset];
+//     } else {
+//       // If it's not a "*" query, use name and version filters
+//       query = `
+//         SELECT
+//           p.p_id,
+//           p.name,
+//           p.github_url,
+//           pv.version,
+//           pv.correctness,
+//           pv.responsiveness,
+//           pv.ramp_up,
+//           pv.bus_factor,
+//           pv.license_metric
+//         FROM
+//           package p
+//         LEFT JOIN
+//           pack_version pv ON p.p_id = pv.p_id
+//         WHERE p.name = ANY($1::text[])
+//         AND pv.version = ANY($2::text[])
+//         OFFSET $3
+//       `;
+//       queryParams = [packageNames, packageVersions, offset];
+//     }
+  
+//     return pool.query(query, queryParams);
+//   };
+  
+  
