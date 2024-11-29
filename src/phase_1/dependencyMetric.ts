@@ -20,7 +20,7 @@ export const calculateDependencyMetric = async (owner: string, repo: string, git
         // If there are no dependencies, return a perfect score
         if (totalDependencies === 0) {
             const latency = performance.now() - start;
-            log(`Dependency score for ${owner}/${repo} calculated with no dependencies.`, 1); // Info level
+            console.log(`Dependency score for ${owner}/${repo} calculated with no dependencies.`, 1); // Info level
             return { score: 1.0, latency };
         }
 
@@ -38,11 +38,12 @@ export const calculateDependencyMetric = async (owner: string, repo: string, git
         const score = pinnedCount / totalDependencies;
         const latency = performance.now() - start;
 
-        log(`Dependency score for ${owner}/${repo} calculated: ${score.toFixed(2)} with latency: ${latency.toFixed(2)} ms`, 1); // Info level
+        console.log(`Dependency score for ${owner}/${repo} calculated: ${score.toFixed(2)} with latency: ${latency.toFixed(2)} ms`, 1); // Info level
         return { score, latency };
 
     } catch (error) {
-        log(`Error fetching package.json for ${owner}/${repo}: ${error}`, 2); // Error level
+        console.log(`Error fetching package.json for ${owner}/${repo}: ${error}`, 2); // Error level
+        
         return { score: 0, latency: 0 }; // Default return values in case of error
     }
 };

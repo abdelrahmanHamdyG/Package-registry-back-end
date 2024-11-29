@@ -9,7 +9,7 @@ import AdmZip from 'adm-zip'
 import pool from '../db.js'; 
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
-import { checkIfIamAdmin, debloat_file, findPackageJson, get_npm_package_name, get_repo_url, zipDirectory } from './utility_controller.js';
+import { checkIfIamAdmin, debloat_file, findPackageJson, get_npm_package_name, get_repo_url, isValidIdFormat, zipDirectory } from './utility_controller.js';
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageHistoryQuery, getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
@@ -19,13 +19,27 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     const offset: number = parseInt(req.query.offset as string) || 0;
     let packages: any[] = [];
   
-  
+
+    if (
+      !Array.isArray(queries) ||
+      queries.some(
+        (query) =>
+          !query.Name || typeof query.Name !== 'string' || !query.Version || typeof query.Version !== 'string'
+      )
+    ) {
+      res.status(400).json({
+        error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
+      });
+      console.error('Invalid or missing fields in PackageQuery');
+      return;
+    }
+
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     // check first if I can search 
   
     if(!token){
-        res.status(401).json({error:"Token missing"})
+        res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
         console.log(`token is missing`)
         return
     }
@@ -47,14 +61,14 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   
       if(canISearchFlag.rows.length==0&&isAdmin!=1){
   
-        res.status(402).json("user not found")
+        res.status(403).json("Authentication failed due to invalid or missing AuthenticationToken.")
         return
       }
   
   
       if(!canISearchFlag.rows[0].can_search){
   
-        res.status(402).json("user not allowed to search")
+        res.status(405).json("user not allowed to search")
         return
   
       }
@@ -97,17 +111,18 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       
       if (!isAdmin) {
         const userGroupResult = await getUserGroupQuery(userId);
-  
-        if (userGroupResult.rows.length === 0) {
-          res.status(403).json({ error: "User group not found" });
-          return;
+        let userGroupId = 456412
+        if (userGroupResult.rows.length != 0) {
+          
+          
+          userGroupId = userGroupResult.rows[0].group_id;  
+            
         }
-  
-        const userGroupId = userGroupResult.rows[0].group_id;
-  
-        // Append group conditions for non-admin users
+
         queryText += ` AND (group_id = $${queryParams.length + 1} OR group_id IS NULL)`;
         queryParams.push(userGroupId);
+  
+        
       }
   
       // Add pagination with OFFSET and LIMIT for each page (let's set limit to 10 as an example)
@@ -134,12 +149,22 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   
   
 export const resetRegistry = async (req: Request, res: Response) => {
-    const isAdmin:Boolean=true;
-    if (!isAdmin) {
+
+    const isAdmin=await checkIfIamAdmin(req);
+
+    
+    if(isAdmin==-1){
+      res.status(403).json({ error: "Authentication failed due to invalid or missing AuthenticationToken."});
+      console.error("not an admin");
+      return;
+      
+    }
+    if (isAdmin==0) {
       res.status(401).json({ error: "You do not have permission to reset the registry."});
       console.error("not an admin");
       return;
     }
+
     const client = await pool.connect();
     try {
       await resetRegistryQuery(client);
@@ -173,7 +198,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized: Token missing.' });
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     console.error(`Unauthorized: Token missing.`)
     return
   }
@@ -277,7 +302,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
     } else {
       // the package is uploaded with URL 
       
-      console.log(`${Name} is uploaded by URL`)
+      
 
       
       const metrics=await processUrl(URL)
@@ -312,10 +337,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
          console.log(`${URL} Package Name is ${package_name}`)
 
         
-      //   // await get_npm_adjacency_list(package_name)
-      //   for (const x of adj_list){
-      //     console.log(x)
-      //   }
+      
         
         URL=await get_repo_url(package_name)
         console.log(`the github repo of the package  is ${URL} `)
@@ -341,22 +363,22 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
 
       // const repoSizeInBytes = getDirectorySize(tempDir);
-      const packageJsonPath = findPackageJson(tempDir);
-      if (packageJsonPath) {
-        // console.log(`Found package.json at: ${packageJsonPath}`);
+      // const packageJsonPath = findPackageJson(tempDir);
+      // if (packageJsonPath) {
+      //   // console.log(`Found package.json at: ${packageJsonPath}`);
 
-        // Read and parse package.json to get dependencies
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+      //   // Read and parse package.json to get dependencies
+      //   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-        // Extract dependencies and devDependencies
-        const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
-        const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
-        // const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
-        // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
-      }
-      else{
-        console.error('error getting the dependencies');
-      }
+      //   // Extract dependencies and devDependencies
+      //   const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
+      //   const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
+      //   // const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
+      //   // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
+      // }
+      // else{
+      //   console.error('error getting the dependencies');
+      // }
 
       if(debloat){
 
@@ -432,147 +454,169 @@ export const uploadPackage = async (req: Request, res: Response) => {
 };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
+  console.log("here")
+  const idRead =req.params.id
+  if(!idRead || !isValidIdFormat(idRead)){
 
-const id =Number(req.params.id)
-
-console.log(`getPackageByID called with ${id}`);
-
-const authHeader = req.headers['authorization'];
-console.log(`auth header is ${authHeader}`)
-const token = authHeader && authHeader.split(' ')[1];
-console.log(`token  is ${authHeader}`)
-
-if (!token) {
-  res.status(401).json({ error: 'Unauthorized: Token missing.' });
-  console.error(`Unauthorized: Token missing.`)
-  return
-}
-
-
-const client = await pool.connect();
-try {
-  
-  const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
-  const userId = decoded.sub;
-  
-  const isAdmin=await checkIfIamAdmin(req)
-  console.log(`my user Id is ${userId}`)
-  
-  await client.query("BEGIN");
-  // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
-
-  const result=await canIReadQuery(userId)    
-  
-  
-  if(result.rows.length==0&&isAdmin!=1){
-
-    res.status(500).json({"error":"Internal Server erorr"})
-    console.error(`no thing returned from the table for user ${userId}`)
-    return
-  }
-  
-  const canIReadBool=result.rows[0]
-  console.log(canIReadBool)
-  if(!canIReadBool.can_download&&isAdmin!=1){
-
-    res.status(400).json({"error":"sorry you don't have access to download this package "})
-    console.error(`sorry you don't have access to download this package as ${userId}`)
+    res.status(400).json({"error":"There is missing field(s) in the PackageID or it is formed improperly, or is invalid."})
     return
   }
 
-  
-  console.log(`User ${userId} can download packages `)
+  const id=Number(idRead)
 
-  const package_data = await getPackageByIDQuery(client, id);
+  if(isNaN(id)){
+    res.status(404).json({"error":"Package does not exist."})
+    return
+  }
+  console.log(`getPackageByID called with ${id}`);
 
-  console.log("we got the package by ID ")
-  if (package_data.rows.length === 0) {
-    console.error(`Package with id:${id} doesn't exist`);
-    await client.query("ROLLBACK");
-     res.status(404).json({ error: "Package doesn't exist" });
-     return;
+  const authHeader = req.headers['authorization'];
+  console.log(`auth header is ${authHeader}`)
+  const token = authHeader && authHeader.split(' ')[1];
+  console.log(`token  is ${authHeader}`)
+
+  if (!token) {
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+    console.error(`Unauthorized: Token missing.`)
+    return
   }
 
-  console.log(package_data.rows[0])
-  
-  if(package_data.rows[0].group_id ){
-    console.log("we are here1 ")
-    const userGroupResults=await getUserGroupQuery(userId)
-    console.log(userGroupResults)
-    console.log(userGroupResults.rows[0])
 
-
-    if(userGroupResults.rows.length==0&&isAdmin!=1){
-      res.status(400).json({"error":"sorry you don't have access to download this package "})
-      console.error(`sorry you don't have access to download this package as ${userId}`)
-      return 
-    }
-    // console.log("we are here 2")
+  const client = await pool.connect();
+  try {
     
-    if(isAdmin!=1){
+    const isAdmin=await checkIfIamAdmin(req)
+
+    if(isAdmin==-1){
+
+      res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
+      return
+
+    }
       
-      if(userGroupResults.rows[0].length==0&&package_data.rows[0].group_id){
-        res.status(400).json({"error":"sorry you don't have access to download this package "})
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    
+    
+    console.log(`my user Id is ${userId}`)
+    
+    await client.query("BEGIN");
+    // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
+
+    const result=await canIReadQuery(userId)    
+    
+    
+    if(result.rows.length==0&&isAdmin!=1){
+
+      res.status(500).json({"error":"Internal Server erorr"})
+      console.error(`no thing returned from the table for user ${userId}`)
+      return
+    }
+    
+    const canIReadBool=result.rows[0]
+    console.log(canIReadBool)
+    if(!canIReadBool.can_download&&isAdmin!=1){
+
+      res.status(405).json({"error":"sorry you don't have access to download this package "})
+      console.error(`sorry you don't have access to download this package as ${userId}`)
+      return
+    }
+
+    
+    console.log(`User ${userId} can download packages `)
+
+    const package_data = await getPackageByIDQuery(client, id);
+
+    console.log("we got the package by ID ")
+    if (package_data.rows.length === 0) {
+      console.error(`Package with id:${id} doesn't exist`);
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Package doesn't exist" });
+      return;
+    }
+
+    console.log(package_data.rows[0])
+    
+    if(package_data.rows[0].group_id ){
+      console.log("we are here1 ")
+      const userGroupResults=await getUserGroupQuery(userId)
+      console.log(userGroupResults)
+      console.log(userGroupResults.rows[0])
+
+
+      if(userGroupResults.rows.length==0&&isAdmin!=1){
+        res.status(405).json({"error":"sorry you don't have access to download this package "})
         console.error(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
+      // console.log("we are here 2")
       
-      if(userGroupResults.rows.length>=0){
+      if(isAdmin!=1){
+        
+        if(userGroupResults.rows[0].length==0&&package_data.rows[0].group_id){
+          res.status(405).json({"error":"sorry you don't have access to download this package "})
+          console.error(`sorry you don't have access to download this package as ${userId}`)
+          return 
+        }
+        
+        if(userGroupResults.rows.length>=0){
 
-          if((package_data.rows[0].group_id)&&userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
-            res.status(400).json({"error":"sorry you don't have access to download this package "})
-            console.error(`sorry you don't have access to download this package as ${userId}`)
-            return 
-          }
+            if((package_data.rows[0].group_id)&&userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
+              res.status(405).json({"error":"sorry you don't have access to download this package "})
+              console.error(`sorry you don't have access to download this package as ${userId}`)
+              return 
+            }
 
+        }
       }
+
     }
 
+
+    const current_data = package_data.rows[0];
+    console.log(`we found the package with id:${id}`)
+
+    // Read from S3
+    const key = `packages/${id}.zip`;
+    const zipFileContent = await downloadFromS3(key);
+    console.log(`Downloaded package successfully from S3 for id: ${id}`);
+    
+    await insertToPackageHistoryQuery(userId,"DOWNLOAD",id,client)
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      metadata: {
+        Name: current_data.name,
+        Version: current_data.version,
+        ID: current_data.id,
+      },
+      data: {
+        Content: zipFileContent.toString('base64'),
+        JSProgram: current_data.js_program,
+        debloat: current_data.debloat,
+        URL: current_data.url,
+      },
+    });
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+
+    if (err  instanceof Error&& err.name === 'TokenExpiredError') {
+      console.error('Authentication failed due to invalid or missing AuthenticationToken.', err);
+      res.status(403).json({ error: 'Token has expired.' });
+      return;
+    }
+
+    console.error(`Error in getting package by ID ${id}: `, err);
+
+    res.status(500).json({ error: 'Internal Server Error' });
+
+  } finally {
+    client.release();
   }
-
-
-  const current_data = package_data.rows[0];
-  console.log(`we found the package with id:${id}`)
-
-  // Read from S3
-  const key = `packages/${id}.zip`;
-  const zipFileContent = await downloadFromS3(key);
-  console.log(`Downloaded package successfully from S3 for id: ${id}`);
-  
-  await insertToPackageHistoryQuery(userId,"DOWNLOAD",id,client)
-  await client.query("COMMIT");
-
-  res.status(200).json({
-    metadata: {
-      Name: current_data.name,
-      Version: current_data.version,
-      ID: current_data.id,
-    },
-    data: {
-      Content: zipFileContent.toString('base64'),
-      JSProgram: current_data.js_program,
-      debloat: current_data.debloat,
-      URL: current_data.url,
-    },
-  });
-
-} catch (err) {
-  await client.query("ROLLBACK");
-
-  if (err  instanceof Error&& err.name === 'TokenExpiredError') {
-    console.error('Token expired:', err);
-    res.status(401).json({ error: 'Token has expired.' });
-    return;
-  }
-
-  console.error(`Error in getting package by ID ${id}: `, err);
-
-  res.status(500).json({ error: 'Internal Server Error' });
-
-} finally {
-  client.release();
-}
 };
+
 
 export const searchPackageByRegex = async (req: Request, res: Response) => {
 const { RegEx } = req.body;
@@ -593,7 +637,7 @@ const authHeader = req.headers['authorization'];
 const token = authHeader && authHeader.split(' ')[1];
 
 if (!token) {
-  res.status(401).json({ error: 'Unauthorized: Token missing.' });
+  res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
   console.error(`Unauthorized: Token missing.`)
   return
 }
@@ -610,7 +654,7 @@ try {
 
     if (!canISearchFlag.rows[0].can_search){
       
-      res.status(400).json({"error":"sorry you don't have access to search with this regex "})
+      res.status(405).json({"error":"sorry you don't have access to search with this regex "})
       console.error(`sorry you don't have access to search about package as ${userId}`)
       return
     }
@@ -679,7 +723,7 @@ catch (error) {
 
   if (error  instanceof Error&& error.name === 'TokenExpiredError') {
     console.error('Token expired:', error);
-    res.status(401).json({ error: 'Token has expired.' });
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     return;
   }
   console.error(`Error in searching by Regex: ${RegEx} `, error);
@@ -935,24 +979,40 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 }
 
-export const getPackageRating=async (req:Request,res:Response)=>{
+export const getPackageRating=async (req:Request,res:Response)=>{ 
 
-const packageId:number = req.params.id as unknown as number;  
+const packageIdRead = req.params.id 
+if(!packageIdRead || !isValidIdFormat(packageIdRead)){
+
+  res.status(400).json({"error":"There is missing field(s) in the PackageID"})
+  return
+}
+
+
+
+const packageId=Number(packageIdRead)
+
+
+if(isNaN(packageId)){
+  res.status(404).json({"error":"Package does not exist."})
+  return
+}
+
+
 console.log(`we are getting package rating for package id ${packageId}`)
 const authHeader = req.headers['authorization'];
 const token = authHeader && authHeader.split(' ')[1];
 
 if (!token) {
-  res.status(401).json({ error: 'Unauthorized: Token missing.' });
+  res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
   console.error(`Unauthorized: Token missing.`)
   return
 }
 
 
 try{
-  if (!packageId){
-    res.status(400).json({error:"can't get package id "})
-  }
+
+
 
   const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
   const userId = decoded.sub;
@@ -962,7 +1022,7 @@ try{
   
   if(result.rows.length==0&&isAdmin!=1){
 
-    res.status(500).json({"error":"Internal Server erorr"})
+    res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
     console.error(`no thing returned from the table for user ${userId}`)
     return
   }
@@ -1014,7 +1074,13 @@ try{
     NetScoreLatency: metrics.rows[0].net_score_latency,
   };
  
+  if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
+    ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice
+  ){
 
+    res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
+    return
+  }
 
   await insertToPackageHistoryRatingQuery(userId,"RATE",packageId)
 
@@ -1024,7 +1090,7 @@ try{
 
     if (error instanceof Error&& error.name === 'TokenExpiredError') {
       console.error('Token expired:', error);
-      res.status(401).json({ error: 'Token has expired.' });
+      res.status(403).json({ error: 'Token has expired.' });
       return;
     }
     console.error('Error fetching package rating:', error);

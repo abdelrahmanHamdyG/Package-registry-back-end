@@ -275,7 +275,7 @@ export  const trackDetails=(req:Request,res:Response)=>{
     res.status(200).json({ plannedTracks });
   } catch (error) {
     console.error('Error in /tracks endpoint:', error);
-    res.status(500).json({ message: 'Internal server error.' });
+    res.status(500).json({ message: 'The system encountered an error while retrieving the student\'s track information.' });
   }
 
 
@@ -373,4 +373,11 @@ export const get_current_date=()=>{
   return formattedDateTime
 
 }
+
+
+export const isValidIdFormat = (input: string): boolean => {
+  const regex = /^[a-zA-Z0-9\-]+$/;
+  return regex.test(input);
+};
+
 

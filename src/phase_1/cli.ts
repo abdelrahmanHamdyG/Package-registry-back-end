@@ -136,7 +136,7 @@ export const processUrl = async (url: string) => {
         dependencyLatency=dependencyMetric.latency
         codeReview=codeReviewResult.score
         codeReviewLatency=codeReviewResult.latency
-
+        console.log(dependency)
     } else {
         log(`Unknown URL format: ${url}`, 1);
         return null;

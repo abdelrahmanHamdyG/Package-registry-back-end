@@ -98,7 +98,7 @@ export const authenticate = async (req: Request, res: Response) => {
     console.log(`we start authenticating with User ${User} and Secret: ${Secret}`)
   
     if (!User || !User.name || !Secret || !Secret.password) {
-      res.status(400).json({ error: 'Missing username or password.' });
+      res.status(400).json({ error: 'There is missing field(s) in the AuthenticationRequest or it is formed improperly.' });
       console.error(`missing user name or password`)
       return;
     }
@@ -106,7 +106,7 @@ export const authenticate = async (req: Request, res: Response) => {
     try {
       const result = await getAllUsersWithNameQuery(User.name);
       if (result.rows.length == 0) {
-        res.status(401).json({ error: 'Username is incorrect.' });
+        res.status(401).json({ error: 'The user or password is invalid.' });
         console.error(`userName ${User} is incorret`) 
         return;
       }
@@ -116,7 +116,7 @@ export const authenticate = async (req: Request, res: Response) => {
       // Verify the password
       const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
       if (!isPasswordValid) {
-        res.status(401).json({ error: 'Password is incorrect.' });
+        res.status(401).json({ error: 'The user or password is invalid.' });
         console.error(`password for userName ${User} is incorret`)
         return;
       }
