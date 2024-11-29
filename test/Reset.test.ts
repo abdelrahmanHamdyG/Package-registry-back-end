@@ -1,5 +1,5 @@
-import { resetRegistry } from '../src/controller'; // Adjust path as needed
-import { resetRegistryQuery } from '../src/queries'; // Adjust path as needed
+import { resetRegistry } from '../src/controllers/utility_controller'; // Adjust path as needed
+import { resetRegistryQuery } from '../src/queries/packages_queries'; // Adjust path as needed
 import pool from '../src/db'; // Adjust path as needed
 import { Request, Response } from 'express';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';

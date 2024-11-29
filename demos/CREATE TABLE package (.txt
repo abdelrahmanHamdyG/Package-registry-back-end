@@ -21,7 +21,7 @@ CREATE TABLE user_account (
     name VARCHAR NOT NULL UNIQUE,
     is_admin BOOLEAN NOT NULL,
     password_hash TEXT NOT NULL,
-         BOOLEAN DEFAULT FALSE,
+    can_download BOOLEAN DEFAULT FALSE,
     can_search BOOLEAN DEFAULT FALSE,
     can_upload BOOLEAN DEFAULT FALSE
 

@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { get_package_rating, getPackageByID, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage,authenticate, trackDetails,registerNewUser,  createGroup, assignUserToGroup, assignPackageToGroup, getAllGroups, getUsersByGroup, logout, updateUserAccess, getUserAccess, getPackageHistory} from "./controller.js";  // Ensure the correct path
+import { trackDetails,} from "./controllers/utility_controller.js";  // Ensure the correct path
+import { getPackageByID, getPackageHistory, getPackageRating, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controllers/packages_controller.js";
+import { authenticate, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
+import { assignPackageToGroup, assignUserToGroup, createGroup, getAllGroups, getUsersByGroup } from "./controllers/groups_controller.js";
 
 const router = Router();
 
@@ -10,7 +13,7 @@ router.get("", (req: Request, res: Response) => {
 });
 
 
-router.get("/package/:id/rate", get_package_rating);
+router.get("/package/:id/rate", getPackageRating);
 router.post("/Access/:user_id",updateUserAccess)
 router.get("/Access/:user_id",getUserAccess)
 
