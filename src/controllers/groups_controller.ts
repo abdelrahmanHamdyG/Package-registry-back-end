@@ -16,7 +16,7 @@ export const createGroup=async(req:Request,res:Response)=>{
 
     const isAdmin=await checkIfIamAdmin(req)
     if(isAdmin==-1){
-      res.status(402).json("token is missing")
+      res.status(402).json("token is missing or expired")
       return 
     }
 
@@ -63,7 +63,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
       const isAdmin=await checkIfIamAdmin(req)
 
       if (isAdmin==-1) {
-        res.status(401).json({ error: 'Unauthorized: Token missing.' });
+        res.status(401).json({ error: 'Unauthorized: Token missing. or expired' });
         return
       }
 
@@ -121,7 +121,7 @@ export const getAllGroups = async (req: Request, res: Response) => {
 
     if (amIAdmin === -1) {
 
-      res.status(401).json({ error: "Token missing or invalid" });
+      res.status(401).json({ error: "Token missing or invalid or expired" });
       console.error("Token missing or invalid");
       return;
     }
@@ -164,7 +164,7 @@ export const getUsersByGroup=async(req:Request,res:Response)=>{
   
     const amIAdmin = await checkIfIamAdmin(req);
     if (amIAdmin === -1) {
-      res.status(401).json({ error: "Token missing or invalid" });
+      res.status(401).json({ error: "Token missing or invalid or expired" });
       console.error("Token missing or invalid");
       return;
     }
@@ -207,7 +207,7 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
       
       
       if (isAdmin==-1) {
-        res.status(401).json({ error: 'Unauthorized: Token missing.' });
+        res.status(401).json({ error: 'Unauthorized: Token missing or expired' });
         return
       }
 

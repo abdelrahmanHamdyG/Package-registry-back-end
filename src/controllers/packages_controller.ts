@@ -155,8 +155,6 @@ export const resetRegistry = async (req: Request, res: Response) => {
   
   
   
-  
-
 
 
 export const uploadPackage = async (req: Request, res: Response) => {
@@ -412,6 +410,13 @@ export const uploadPackage = async (req: Request, res: Response) => {
     await client.query('ROLLBACK');
 
     console.error(`Error in uploading package: ${Name}`, error);
+    
+    if (error  instanceof Error&& error.name === 'TokenExpiredError') {
+      console.error('Token expired:', error);
+      res.status(401).json({ error: 'Token has expired.' });
+      return;
+    }
+  
     if ((error as any).code === '23505') {
       console.error('Error in uploading package:', error);
       res.status(409).json({ error: 'Package exists already.' });
@@ -553,8 +558,17 @@ try {
 
 } catch (err) {
   await client.query("ROLLBACK");
+
+  if (err  instanceof Error&& err.name === 'TokenExpiredError') {
+    console.error('Token expired:', err);
+    res.status(401).json({ error: 'Token has expired.' });
+    return;
+  }
+
   console.error(`Error in getting package by ID ${id}: `, err);
+
   res.status(500).json({ error: 'Internal Server Error' });
+
 } finally {
   client.release();
 }
@@ -662,6 +676,12 @@ try {
 
 }
 catch (error) {
+
+  if (error  instanceof Error&& error.name === 'TokenExpiredError') {
+    console.error('Token expired:', error);
+    res.status(401).json({ error: 'Token has expired.' });
+    return;
+  }
   console.error(`Error in searching by Regex: ${RegEx} `, error);
   res.status(500).json({ error: 'Internal Server Error' });
 } finally {
@@ -834,66 +854,82 @@ else{
 export const getPackageHistory=async(req:Request,res:Response)=>{
 
 
-const {id}=req.body
+  const {id}=req.body
 
-console.log(`we are getting package history for package ${id}`)
-
-
-if(!id){
-  res.status(401).json({error:"id missing "})
-  console.log(`id ${id} missing`)
-  return
-}
+  console.log(`we are getting package history for package ${id}`)
 
 
-try{
+  if(!id){
+    res.status(401).json({error:"id missing "})
+    console.log(`id ${id} missing`)
+    return
+  }
 
-  const isAdmin=await checkIfIamAdmin(req)
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-  if(isAdmin==-1){
-      res.status(402).json({error:"token not found"})
-      console.log(`token not found`)
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized: Token missing.' });
+    console.error(`Unauthorized: Token missing.`)
+    return
+  }
+
+
+
+  try{
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    const isAdmin=await checkIfIamAdmin(req)
+
+    if(isAdmin==-1){
+        res.status(402).json({error:"token not found"})
+        console.log(`token not found`)
+        return
+    }
+
+    if(isAdmin==0){
+
+      res.status(403).json({error:"Only admins are allowed to view package history"})
+      console.log(`he is not an admin`)
       return
-  }
+    }
 
-  if(isAdmin==0){
+    console.log(`you are an admin`)
 
-    res.status(403).json({error:"Only admins are allowed to view package history"})
-    console.log(`he is not an admin`)
+    const doesPackageExists=await checkPackageExistsQuery(id)
+
+    if(doesPackageExists.rows.length==0){
+
+      res.status(404).json({error:"package doesn't exists"})
+      console.log(`package with id ${id} doesn't exists`)
+      return
+    }
+
+
+    const history = await getPackageHistoryQuery(id);
+
+    if (history.rows.length === 0) {
+      res.status(405).json({ error: "No history found for the specified package" });
+      console.log(`No history found for package with ID ${id}`);
+      return;
+    }
+
+    console.log(`Returning package history for package ${id}`);
+    res.status(200).json(history.rows);
     return
+
+  }catch(error){
+
+
+    if (error  instanceof Error&& error.name === 'TokenExpiredError') {
+      console.error('Token expired:', error);
+      res.status(401).json({ error: 'Token has expired.' });
+      return;
+    }
+    console.log(`error in getting package ${id} history ${error}`)
+    res.status(500).json({ error: 'Internal server error' });
+    return 
   }
-
-  console.log(`you are an admin`)
-
-  const doesPackageExists=await checkPackageExistsQuery(id)
-
-  if(doesPackageExists.rows.length==0){
-
-    res.status(404).json({error:"package doesn't exists"})
-    console.log(`package with id ${id} doesn't exists`)
-    return
-  }
-
-
-const history = await getPackageHistoryQuery(id);
-
-  if (history.rows.length === 0) {
-    res.status(405).json({ error: "No history found for the specified package" });
-    console.log(`No history found for package with ID ${id}`);
-    return;
-  }
-
-  console.log(`Returning package history for package ${id}`);
-  res.status(200).json(history.rows);
-  return
-
-}catch(err){
-
-
-  console.log(`error in getting package ${id} history`)
-  res.status(500).json({ error: 'Internal server error' });
-  return 
-}
 
 
 
@@ -986,7 +1022,11 @@ try{
 
   } catch (error) {
 
-
+    if (error instanceof Error&& error.name === 'TokenExpiredError') {
+      console.error('Token expired:', error);
+      res.status(401).json({ error: 'Token has expired.' });
+      return;
+    }
     console.error('Error fetching package rating:', error);
     if (error instanceof Error) {
         res.status(500).json({ message: `Internal server error: ${error.message}` });

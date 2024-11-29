@@ -28,7 +28,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
       
       
       if (isAdmin2==-1) {
-         res.status(401).json({ error: 'Unauthorized: Token missing.' });
+         res.status(401).json({ error: 'Unauthorized: Token missing. or expired ' });
          console.error(`token missing for user name :${name} maybe not admin`)
          return
       }
@@ -131,7 +131,7 @@ export const authenticate = async (req: Request, res: Response) => {
       // Calculate token expiration date
       const expirationDate = new Date();
       expirationDate.setHours(expirationDate.getHours() + 10); // Token valid for 10 hours
-  
+      
       // Insert the token into the user_tokens table
       await insertToUserTokenQuery(user.id, token, expirationDate.toISOString());
       console.log(`we inserted the token`)
@@ -144,9 +144,6 @@ export const authenticate = async (req: Request, res: Response) => {
   };
   
   
-
-
-
 
 export const logout = async (req: Request, res: Response) => {
     const authHeader = req.headers['authorization'];
@@ -183,7 +180,7 @@ export const getUserAccess=async (req:Request,res:Response)=>{
   const isAdmin=await checkIfIamAdmin(req);
     
   if (isAdmin === -1) {
-    res.status(401).json({ error: 'Unauthorized: Token missing or invalid.' });
+    res.status(401).json({ error: 'Unauthorized: Token missing or invalid. or expired' });
     return;
   }
 
@@ -250,7 +247,7 @@ export const updateUserAccess = async (req: Request, res: Response) => {
     const isAdmin = await checkIfIamAdmin(req);
 
     if (isAdmin === -1) {
-      res.status(401).json({ error: 'Unauthorized: Token missing or invalid.' });
+      res.status(401).json({ error: 'Unauthorized: Token missing or invalid or expired' });
       return;
     }
 

@@ -39,8 +39,9 @@ export const checkIfIamAdmin = async (req: Request)=>{
         return 1
     else
         return 0
-  } catch (err) {
-    console.error("Token verification failed:", err);
+  } catch (error) {
+    
+    console.error("Token verification failed:", error);
     return -1; // Invalid token
   }
 };
