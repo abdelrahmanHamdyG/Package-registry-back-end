@@ -95,7 +95,7 @@ export const doesGroupExistQuery = async (groupId: number): Promise<boolean> => 
 
   
   
-export const isUserAlreadyInGroupQuery = async (
+export const  isUserAlreadyInGroupQuery = async (
     userId: number,
   
   ): Promise<boolean> => {

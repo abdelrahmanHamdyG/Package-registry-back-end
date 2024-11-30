@@ -63,7 +63,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
       const isAdmin=await checkIfIamAdmin(req)
 
       if (isAdmin==-1) {
-        res.status(401).json({ error: 'Unauthorized: Token missing. or expired' });
+        res.status(401).json({ error: 'Unauthorized: Token missing or expired' });
         return
       }
 
@@ -93,7 +93,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
       if (isUserInGroup) {
   
          await updateUserGroupQuery(user_id,groupId)
-         res.status(409).json({ message: `User assigned to a new group ${groupId}`});
+         res.status(202).json({ message: `User assigned to a new group ${groupId}`});
          console.log(`User ${user_id} assigned to a new group ${groupId}`)
          return
       }
@@ -110,9 +110,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
     }
 };
   
-  
-    
-  
+
 export const getAllGroups = async (req: Request, res: Response) => {
 
     console.log("Getting all groups available...");
@@ -187,17 +185,31 @@ export const getUsersByGroup=async(req:Request,res:Response)=>{
   
     }
   
-  
-  
 }
-  
   
   
 
 export const assignPackageToGroup=async(req:Request,res:Response)=>{
+  
 
-    const groupId=req.params.groupid as unknown as number
-    const {package_id}=req.body
+    let groupIdRead=req.params.groupid 
+    let {package_id}=req.body
+
+
+    if(!groupIdRead ||!package_id){
+      res.status(405).json({error:"missing group id or package id "})
+      return
+    }
+
+
+    package_id=Number(package_id)
+    const groupId=Number(groupIdRead)
+
+    if(isNaN(package_id) || isNaN(groupId)){
+
+      res.status(406).json({error:"wrong format for group id or package id "})
+      return
+    }
 
 
 
