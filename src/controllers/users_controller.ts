@@ -4,7 +4,11 @@ import e, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../db.js'; 
 import { checkIfIamAdmin } from './utility_controller.js';
-import { getAllUsersWithNameQuery, getUserAccessQuery, insertToUserTokenQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
+import {  getAllUsersWithNameQuery, getUserAccessQuery, getUserWithUserNameQuery, insertToUserTokenQuery, insertUserToUsersQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
+import { doesGroupExistQuery, insertUserToGroupQuery } from '../queries/groups_queries.js';
+
+
+
 
 export const registerNewUser = async (req: Request, res: Response) => {
   
@@ -18,22 +22,20 @@ export const registerNewUser = async (req: Request, res: Response) => {
        return
     }
   
-    const client = await pool.connect(); // Use a client for the transaction
+    const client = await pool.connect(); 
   
     try {
-      await client.query('BEGIN'); // Start the transaction
+      await client.query('BEGIN'); 
   
       const isAdmin2=await checkIfIamAdmin(req)
       
-      
-      
+
       if (isAdmin2==-1) {
          res.status(401).json({ error: 'Unauthorized: Token missing. or expired ' });
          console.error(`token missing for user name :${name} maybe not admin`)
          return
       }
   
-      // const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown;
       if (
         isAdmin2!=1
       ) {
@@ -42,9 +44,8 @@ export const registerNewUser = async (req: Request, res: Response) => {
          return
       }
   
-      // Check if the user already exists
-      const existingUserQuery = 'SELECT * FROM user_account WHERE name = $1';
-      const existingUserResult = await client.query(existingUserQuery, [name]);
+      
+      const existingUserResult = await getUserWithUserNameQuery(client,name)
   
       if (existingUserResult.rows.length > 0) {
          res.status(409).json({ error: 'User with this name already exists.' });
@@ -52,43 +53,37 @@ export const registerNewUser = async (req: Request, res: Response) => {
          return
       }
   
-      // Hash the user's password
+      
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
   
-      // Insert the new user
-      const insertUserQuery = `
-        INSERT INTO user_account (name, password_hash, is_admin,can_download,can_search,can_upload)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
-      `;
-      const userInsertResult = await client.query(insertUserQuery, [name, hashedPassword, isAdmin || false,canDownload,canSearch,canUpload]);
+      
+      
+      const userInsertResult = await insertUserToUsersQuery(client,name,hashedPassword,isAdmin,canDownload,canSearch,canUpload)
       const userId = userInsertResult.rows[0].id;
   
-      // Assign the user to the group (if groupId is provided)
+      
       if (groupId) {
-        const groupCheckQuery = 'SELECT * FROM user_groups WHERE id = $1';
-        const groupResult = await client.query(groupCheckQuery, [groupId]);
+       
+        const groupResult = await doesGroupExistQuery(groupId,client);
   
-        if (groupResult.rows.length === 0) {
-          throw new Error('Group does not exist.');
+        if (!groupResult) {
+          res.status(409).json({error:"This group doesn't exist"})
+          return
         }
-  
-        const assignGroupQuery = `
-          INSERT INTO user_group_membership (user_id, group_id)
-          VALUES ($1, $2)
-        `;
-        await client.query(assignGroupQuery, [userId, groupId]);
+
+        insertUserToGroupQuery(userId,groupId,client)
+
       }
   
-      await client.query('COMMIT'); // Commit the transaction
+      await client.query('COMMIT'); 
       res.status(201).json({ message: 'User registered successfully.' });
     } catch (error) {
-      await client.query('ROLLBACK'); // Roll back the transaction
+      await client.query('ROLLBACK'); 
       console.error('Error during user registration:', error);
       res.status(500).json({ error: 'Internal server error.' });
     } finally {
-      client.release(); // Release the client back to the pool
+      client.release(); 
     }
   };
   

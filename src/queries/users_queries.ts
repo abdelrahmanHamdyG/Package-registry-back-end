@@ -1,5 +1,7 @@
 
+import { PoolClient } from 'pg';
 import pool from '../db.js'; // Adjust the path according to your project structure
+import { bool } from 'aws-sdk/clients/signer.js';
 
 
 
@@ -148,4 +150,23 @@ export const canUserAccessPackageQuery  = async (userId: number, packageId: numb
   }
   
   
-  
+  export const getUserWithUserNameQuery=async(client:PoolClient,userName:string)=>{
+
+
+    const query=`SELECT * FROM user_account WHERE name = $1`
+
+    return await client.query(query, [userName]);
+
+  }
+
+  export const insertUserToUsersQuery=async(client:PoolClient,name:string,password_hash:string,is_admin:boolean,can_download:boolean,can_search:boolean,can_upload:boolean)=>{
+
+
+    const insertUserQuery = `
+        INSERT INTO user_account (name, password_hash, is_admin,can_download,can_search,can_upload)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `;
+
+      return await client.query(insertUserQuery, [name, password_hash, is_admin || false,can_download,can_search,can_upload]);
+  }

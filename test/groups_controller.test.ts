@@ -40,11 +40,6 @@ vi.mock('../src/queries/packages_queries',()=>({
 
 }));
 
-
-
-
-
-
 describe("createGroup",()=>{
 
     it('Should create group successfully 202',async()=>{
@@ -424,9 +419,6 @@ describe("getUsersByGroups",async()=>{
       });
       
 })
-
-
-
 
 
 describe("assignPackageToGroup",async()=>{

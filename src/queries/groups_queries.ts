@@ -1,4 +1,7 @@
+import { Pool, PoolClient } from 'pg';
 import pool from '../db.js'; 
+
+
 
 export const getUserGroupQuery = async (userId: number) => {
     const query = `
@@ -84,12 +87,12 @@ export const updateUserGroupQuery=async(user_id:number,group_id:number)=>{
 
 
 
-export const doesGroupExistQuery = async (groupId: number): Promise<boolean> => {
+export const doesGroupExistQuery = async (groupId: number,client:PoolClient|Pool=pool): Promise<boolean> => {
     const query = `
       SELECT 1 FROM user_groups
       WHERE id = $1
     `;
-    const result = await pool.query(query, [groupId]);
+    const result = await client.query(query, [groupId]);
     return result.rows.length > 0;
   };
 
@@ -109,12 +112,12 @@ export const  isUserAlreadyInGroupQuery = async (
   
   
   
-  export const insertUserToGroupQuery = async (userId: number, groupId: number) => {
+  export const insertUserToGroupQuery = async (userId: number, groupId: number,client:PoolClient|Pool=pool) => {
     const query = `
       INSERT INTO user_group_membership (user_id, group_id)
       VALUES ($1, $2)
     `;
-    await pool.query(query, [userId, groupId]);
+    await client.query(query, [userId, groupId]);
   };
   
 
