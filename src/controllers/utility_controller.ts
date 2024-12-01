@@ -9,6 +9,8 @@ import archiver from "archiver";
 import pool from '../db.js'; 
 import { Bool } from 'aws-sdk/clients/clouddirectory.js';
 import {log} from '../phase_1/logging.js'
+import { PoolClient } from 'pg';
+import { insertPackageDependency } from '../queries/packages_queries.js';
 
 
 
@@ -99,49 +101,53 @@ export const debloat_file=async (dir:string)=>{
 }
 
 
+export const get_npm_adjacency_list = async (
+  packageName: string,
+  adj_list: Map<string, { strings: Set<string>; num: number }>
+) => {
+  const normalizedPackageName = packageName.toLowerCase(); // Normalize package name
+  const url = `https://registry.npmjs.org/${normalizedPackageName}`;
+  console.log(url);
 
-
-export const get_npm_adjacency_list = async (packageName: string) => {
-  const url = `https://registry.npmjs.org/${packageName}`;
   try {
-      const response = await fetch(url);
-      if (!response.ok) {
-          throw new Error(`Could not fetch data for package: ${packageName}`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Could not fetch data for package: ${normalizedPackageName}`);
+    }
+
+    const data = await response.json();
+    const latestVersion = data['dist-tags'].latest;
+    const dependencies = data.versions[latestVersion].dependencies || {};
+    const packageSize = data.versions[latestVersion].dist?.unpackedSize || 0;
+
+    // Skip if already processed
+    if (adj_list.has(normalizedPackageName)) {
+      return;
+    }
+
+    // Add the package to the adj_list
+    adj_list.set(normalizedPackageName, { strings: new Set<string>(), num: packageSize });
+
+    // Process dependencies
+    for (const dependency of Object.keys(dependencies)) {
+      const normalizedDependency = dependency.toLowerCase();
+
+      // Skip already processed dependencies
+      if (!adj_list.has(normalizedDependency)) {
+        adj_list.get(normalizedPackageName)!.strings.add(normalizedDependency);
+
+        // Recursive call for the dependency
+        try {
+          await get_npm_adjacency_list(normalizedDependency, adj_list);
+        } catch (error) {
+          console.error(`Error processing dependency ${normalizedDependency}:`, error);
+        }
       }
-
-      const data = await response.json();
-      const latestVersion = data['dist-tags'].latest;
-      const dependencies = data.versions[latestVersion].dependencies || {};
-      const packageSize = data.versions[latestVersion].dist.unpackedSize;
-
-      // If the package is already in the adj_list, we skip it
-      if (adj_list.has(packageName)) {
-          return;
-      }
-
-      // Add the package to the adj_list with an empty Set of strings and num 0
-      adj_list.set(packageName, { strings: new Set<string>(), num: packageSize });
-
-      // Add each dependency to the strings Set
-      for (const dependency of Object.keys(dependencies)) {
-          // If the dependency is already in the adj_list, skip it
-          if (adj_list.has(dependency)) {
-              continue;
-          }
-
-          // Add the dependency to the current package's Set
-          adj_list.get(packageName)!.strings.add(dependency);
-
-          // Recursively fetch the adjacency list for the dependency
-          await get_npm_adjacency_list(dependency);
-      }
+    }
   } catch (error) {
-      if (error instanceof Error) {
-          log(error.message);
-      }
+    console.error(`Error processing package ${packageName}:`, error);
   }
 };
-
 
 export const get_npm_package_name=(path:string):string=>{
 
@@ -151,19 +157,47 @@ export const get_npm_package_name=(path:string):string=>{
 }
 
 let cost = new Map<string, number>();
-export const calculate_cost=(package_name:string)=>{
-  let standaloneCost=adj_list.get(package_name)!.num
-  let totalCost=standaloneCost
-  for(const dep of adj_list.get(package_name)!.strings){
 
-
-    calculate_cost(dep)
-    totalCost=totalCost+(cost.get(dep)||0) //sum the standalone costs of the dependencies + the cost of
-    
-  
+export const calculate_cost = (
+  package_name: string,
+  adj_list: Map<string, { strings: Set<string>; num: number }>,
+  cost: Map<string, number>,
+  visited = new Set<string>() // Track visited packages
+): void => {
+  if (cost.has(package_name)) {
+    return; // Skip already calculated packages
   }
-  cost.set(package_name,totalCost)
-}
+
+  const packageData = adj_list.get(package_name);
+  if (!packageData) {
+    console.warn(`Package ${package_name} not found in adj_list`);
+    return; // Skip missing packages
+  }
+
+  const standaloneCost = packageData.num ?? 0; // Default to 0 if undefined
+  let totalCost = standaloneCost;
+
+  if (visited.has(package_name)) {
+    console.warn(`Circular dependency detected: Skipping ${package_name}`);
+    return; // Skip circular dependencies
+  }
+
+  visited.add(package_name);
+
+  for (const dep of packageData.strings) {
+    if (!adj_list.has(dep)) {
+      console.warn(`Dependency ${dep} not found for package: ${package_name}`);
+      continue; // Skip missing dependencies
+    }
+    calculate_cost(dep, adj_list, cost, visited);
+    totalCost += cost.get(dep) || 0; // Add only valid costs
+  }
+
+  cost.set(package_name, totalCost);
+  visited.delete(package_name); // Remove from visited after processing
+};
+
+
 
 export const fetch_package_size = async (packageName: string): Promise<number> => {
     const url = `https://registry.npmjs.org/${packageName}`;
@@ -184,18 +218,34 @@ export const fetch_package_size = async (packageName: string): Promise<number> =
     }
 };
 
-export const printingTheCost=async (package_name:string,flag:Bool)=>{
-  //making the adj_list
-  if (!flag)
-    await get_npm_adjacency_list(package_name)
-  
-  calculate_cost(package_name)
-  for(const pack of adj_list.keys()){
-    log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
-  }
-  
+export const printingTheCost = async (
+  package_id:Number,
+  package_name: string,
+  adj_list: Map<string, { strings: Set<string>; num: number }>,
+  client: PoolClient
+) => {
+  // Map to store calculated costs
+  let cost = new Map<string, number>();
 
-}
+  // Calculate costs for all packages
+  calculate_cost(package_name, adj_list, cost);
+
+  // Insert package dependencies into the database
+  for (const pack of adj_list.keys()) {
+    const standaloneCost = adj_list.get(pack)!.num ?? 0; // Default to 0 if undefined
+    const totalCost = cost.get(pack) ?? 0; // Default to 0 if undefined
+
+    try {
+      await insertPackageDependency(client, package_id, pack, standaloneCost, totalCost);
+      console.log(`${pack} - Standalone Cost: ${standaloneCost}, Total Cost: ${totalCost}`);
+    } catch (error) {
+      console.error(`Error inserting dependency for ${pack}:, error`);
+    }
+  }
+};
+
+
+
 
 export const get_repo_url=async(package_name:string)=>{
 
@@ -213,53 +263,18 @@ export const get_repo_url=async(package_name:string)=>{
 
 }
 
-export const githubPackagejson= async (url: string)=>{
-  try{
-    const repoData=await fetch(url)
-    log(` repo data :${repoData}`)
-    const repoName=getGitHubRepoNameFromUrl(url) as string
-    
-    if(!repoData.ok){
-      throw new Error(`Could not fetch data for github url: ${url}`);
-    }
-    const findindBranch=await repoData.json()
-    log(`findind branch: ${findindBranch}`)
-    const sizeInKb = findindBranch.size
-    const defaultBranch= findindBranch.default_branch
-    const packagejsonURL=`url+/${defaultBranch}/package.json`
-    log(`the package Json URL is ${packagejsonURL}`)
-    const packagejsonResponse=await fetch(packagejsonURL)
-    if(!packagejsonResponse.ok){
-      throw new Error(`Could not fetch data for the package.json of github url: ${url}`);
-    }
-    const packagejson= await packagejsonResponse.json()
-    const dependenciesSet = new Set(Object.keys(packagejson.dependencies))
-    const devDependenciesSet = new Set(Object.keys(packagejson.devDependencies))
-    const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
-    adj_list.set(repoName, { strings: new Set<string>(), num: sizeInKb });
-    for (const dep of totaldependencies){
-      get_npm_adjacency_list(dep)
-    }
-    printingTheCost(repoName,true)
-  }
-  
-  catch (error) {
-    log(`Error: ${error}`);
-  }
- 
-}
+
 
 export const getGitHubRepoNameFromUrl = (url: string): string | null => {
   const regex = /github\.com[\/:](.+?)\/([^\/]+)/;
   
   const match = url.match(regex);
-  log("we are heerrrr")
+  console.log("we are heerrrr")
   if (match) {
       return match[2]; // Return the repository name (second capture group)
   }
   return null; // Return null if the URL doesn't match the pattern
 };
-
 
 
 
@@ -281,22 +296,7 @@ export  const trackDetails=(req:Request,res:Response)=>{
 
 }
 
-export const costOfGithubUrl= async (url:string, sizeInB: number,totaldependencies: Set<string>)=>{
-  try{
-   
-    const repoName=getGitHubRepoNameFromUrl(url) as string
-    adj_list.set(repoName, { strings: new Set<string>(), num: sizeInB });
-    for (const dep of totaldependencies){
-      get_npm_adjacency_list(dep)
-    }
-    printingTheCost(repoName,true)
-  }
-  
-  catch (error) {
-    log(`Error: ${error}`, );
-  }
-  
-}
+
 export const findPackageJson = (dir: string): string | null => {
   const files = fs.readdirSync(dir); // Read files in the current directory
 
@@ -380,3 +380,59 @@ export const isValidIdFormat = (input: string): boolean => {
 };
 
 
+
+
+export const getPackagesFromPackageJson=(dir: string): string[]=> {
+  const packagesList: string[] = [];
+  const packageJsonPath=getPackageJson(dir)
+  if(packageJsonPath){
+    if (fs.existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+        // Extract dependencies and devDependencies if they exist
+        if (packageJson.dependencies) {
+            packagesList.push(...Object.keys(packageJson.dependencies));
+        }
+        if (packageJson.devDependencies) {
+            packagesList.push(...Object.keys(packageJson.devDependencies));
+        }
+    } else {
+        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+    }
+  }
+  else {
+    console.error(`error`)
+  }
+  return packagesList;
+}
+
+
+const getPackageJson=(dir: string): string | null=> {
+  const files = fs.readdirSync(dir); // Read files in the current directory
+
+  if( files.includes("package.json")){
+    return path.join(dir, "package.json");
+  }
+  for (const file of files) {
+      const fullPath = path.join(dir, file);
+
+      
+      
+      // If it's a directory, recursively search inside it
+    
+      // If the file is 'package.json', return its path
+      if (file === 'package.json') {
+          log(`full path is ${fullPath}`)
+          return fullPath;
+      }
+      if (fs.statSync(fullPath).isDirectory()) {
+        const result = getPackageJson(fullPath);
+        if (result) {
+            return result; // Found the package.json
+        }
+      }
+
+  }
+
+  return null; // Return null if 'package.json' is not found
+}

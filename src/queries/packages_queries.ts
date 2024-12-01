@@ -245,3 +245,28 @@ export const insertToPackageHistoryRatingQuery =async(user_id:number,action:stri
 }
 
 
+export const insertPackageDependency = (
+  client: PoolClient,
+  id: Number,
+  dependency: string,
+  standalone: number,
+  total: number,
+) => {
+  const query = `
+    INSERT INTO package_dependencies (package_id, dependency,standalone_cost,total_cost)
+    VALUES ($1, $2, $3,$4)
+    RETURNING *;
+  `;
+  return client.query(query, [id, dependency,standalone,total]);
+};
+
+
+export const getPackageDependeciesByIDQuery= (
+  client: PoolClient,
+  ID: Number,
+) => {
+  const query = `
+    select * from package_dependencies where package_id=$1;
+  `;
+  return client.query(query, [ID]);
+};

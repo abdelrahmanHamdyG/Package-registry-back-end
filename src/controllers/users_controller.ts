@@ -250,7 +250,7 @@ export const updateUserAccess = async (req: Request, res: Response) => {
 
     try {
       const result = await updateUserAccessQuery(can_download, can_search, can_upload, user_id);
-
+      
       if (result.rowCount === 0) {
         res.status(404).json({ error: 'User not found.' });
         return;

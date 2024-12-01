@@ -7,9 +7,9 @@ const app = express();
 
 
 app.use(cors())
-app.use(express.json()); 
 
-app.use(bodyParser.json()); 
+app.use(bodyParser.json({ limit: "50mb" }))
+
 app.use("/", router);  
 
 const PORT =  3000;

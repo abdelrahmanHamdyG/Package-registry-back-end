@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Request, Response } from "express";
 import { trackDetails,} from "./controllers/utility_controller.js";  // Ensure the correct path
-import { getPackageByID, getPackageHistory, getPackageRating, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controllers/packages_controller.js";
+import { getPackageByID, getPackageHistory, getPackageRating, packageCost, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controllers/packages_controller.js";
 import { authenticate, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
 import { assignPackageToGroup, assignUserToGroup, createGroup, getAllGroups, getUsersByGroup } from "./controllers/groups_controller.js";
 
@@ -44,16 +44,15 @@ router.get("/tracks",trackDetails)
 router.post("/register",registerNewUser)
 
 router.post("/group",createGroup)
-router.post("/:groupid/add_user",assignUserToGroup)
-router.post("/:groupid/add_package",assignPackageToGroup)
+router.post("/add_user/:groupid",assignUserToGroup)
+router.post("/add_package/:groupid",assignPackageToGroup)
 
 router.get("/groups",getAllGroups)
 router.get("/groups/:groupid",getUsersByGroup)
 router.post("/logout/",logout)
 
-router.get("/history",getPackageHistory)
-
+router.post("/history",getPackageHistory)
+router.get("/package/:id/cost",packageCost)
 // POST /package/byRegEx - Search packages by regular expression
- 
 
 export default router;  // Export router for use in the app
