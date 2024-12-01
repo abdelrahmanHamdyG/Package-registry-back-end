@@ -22,11 +22,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
     if (
       !Array.isArray(queries) ||
-      queries.some(
-        (query) =>
-          !query.Name || typeof query.Name !== 'string' || !query.Version || typeof query.Version !== 'string'
-      )
-    ) {
+      queries.some((query) =>!query.Name || typeof query.Name !== 'string' || !query.Version || typeof query.Version !== 'string')) {
       res.status(400).json({
         error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
       });
@@ -165,22 +161,19 @@ export const resetRegistry = async (req: Request, res: Response) => {
       return;
     }
 
-    const client = await pool.connect();
+    
     try {
-      await resetRegistryQuery(client);
+      await resetRegistryQuery();
       res.status(200).json({error:'Registry is reset'});
     }
     catch (error) {
       console.error('Error in reseting the registry:', error);
       res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-      client.release();      
     }
 };
   
   
   
-
 
 export const uploadPackage = async (req: Request, res: Response) => {
   let { Name, Content, JSProgram, debloat, URL } = req.body;
@@ -456,7 +449,9 @@ export const uploadPackage = async (req: Request, res: Response) => {
 export const getPackageByID = async (req: Request, res: Response)=> {
   console.log("here")
   const idRead =req.params.id
-  if(!idRead || !isValidIdFormat(idRead)){
+
+  const regex = /^[a-zA-Z0-9\-]+$/;
+  if(!idRead || !regex.test(idRead)){
 
     res.status(400).json({"error":"There is missing field(s) in the PackageID or it is formed improperly, or is invalid."})
     return
@@ -509,8 +504,9 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     if(result.rows.length==0&&isAdmin!=1){
 
-      res.status(500).json({"error":"Internal Server erorr"})
       console.error(`no thing returned from the table for user ${userId}`)
+      res.status(500).json({"error":"Internal Server erorr"})
+      
       return
     }
     
@@ -602,7 +598,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
   } catch (err) {
     await client.query("ROLLBACK");
 
-    if (err  instanceof Error&& err.name === 'TokenExpiredError') {
+    if (err  instanceof Error&& err.message === 'TokenExpiredError') {
       console.error('Authentication failed due to invalid or missing AuthenticationToken.', err);
       res.status(403).json({ error: 'Token has expired.' });
       return;
@@ -672,17 +668,17 @@ try {
     const metadataList=[]
     for (let i=0;i<packageMetaData.rows.length;i++){
     
-    const packId:number = packageMetaData.rows[i].id;
-    const packName:string=packageMetaData.rows[i].name;
-    const packVersion:string=packageMetaData.rows[i].version;
-    
-      metadataList.push({
-        metadata:{
-          Name:packName,
-          Version:packVersion,
-          ID:packId
-        }
-      });
+      const packId:number = packageMetaData.rows[i].id;
+      const packName:string=packageMetaData.rows[i].name;
+      const packVersion:string=packageMetaData.rows[i].version;
+      
+        metadataList.push({
+          metadata:{
+            Name:packName,
+            Version:packVersion,
+            ID:packId
+          }
+        });
     }
     res.status(200).json(metadataList)
   }else{
@@ -700,18 +696,20 @@ try {
     const metadataList=[]
     for (let i=0;i<packageMetaData.rows.length;i++){
     
-    const packId:number = packageMetaData.rows[i].id;
-    const packName:string=packageMetaData.rows[i].name;
-    const packVersion:string=packageMetaData.rows[i].version;
-    
-      metadataList.push({
-        metadata:{
-          Name:packName,
-          Version:packVersion,
-          ID:packId
-        }
-      });
+      const packId:number = packageMetaData.rows[i].id;
+      const packName:string=packageMetaData.rows[i].name;
+      const packVersion:string=packageMetaData.rows[i].version;
+      
+        metadataList.push({
+          metadata:{
+            Name:packName,
+            Version:packVersion,
+            ID:packId
+          }
+        });
     }
+
+    
     res.status(200).json(metadataList)
 
 
@@ -921,8 +919,7 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 
   try{
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
-    const userId = decoded.sub;
+
     const isAdmin=await checkIfIamAdmin(req)
 
     if(isAdmin==-1){
@@ -930,6 +927,9 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
         console.log(`token not found`)
         return
     }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    
 
     if(isAdmin==0){
 
@@ -981,125 +981,127 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 export const getPackageRating=async (req:Request,res:Response)=>{ 
 
-const packageIdRead = req.params.id 
-if(!packageIdRead || !isValidIdFormat(packageIdRead)){
+  const packageIdRead = req.params.id 
+  const regex = /^[a-zA-Z0-9\-]+$/;
 
-  res.status(400).json({"error":"There is missing field(s) in the PackageID"})
-  return
-}
+  if(!packageIdRead || !regex.test(packageIdRead)){
 
-
-
-const packageId=Number(packageIdRead)
-
-
-if(isNaN(packageId)){
-  res.status(404).json({"error":"Package does not exist."})
-  return
-}
-
-
-console.log(`we are getting package rating for package id ${packageId}`)
-const authHeader = req.headers['authorization'];
-const token = authHeader && authHeader.split(' ')[1];
-
-if (!token) {
-  res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-  console.error(`Unauthorized: Token missing.`)
-  return
-}
-
-
-try{
-
-
-
-  const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
-  const userId = decoded.sub;
-  const isAdmin=await checkIfIamAdmin(req)
-
-  const result=await canISearchQuery(userId)    
-  
-  if(result.rows.length==0&&isAdmin!=1){
-
-    res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
-    console.error(`no thing returned from the table for user ${userId}`)
-    return
-  }
-
-  const canISearchBool=result.rows[0].can_search
-  if(!canISearchBool && isAdmin!=1){
-
-    res.status(402).json({"error":"sorry you are not allowed to get the rating "})
-    console.error(`sorry you  ${userId} are not allowed to get the rating `)
+    res.status(400).json({"error":"There is missing field(s) in the PackageID"})
     return
   }
 
 
-  const same_group_id=await canUserAccessPackageQuery(userId,packageId)
 
-  if(!same_group_id && isAdmin!=1){
-    res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
-    console.error(`sorry you are not allowed to get the rating of this package${userId}`)
-    return
+  const packageId=Number(packageIdRead)
 
-  }
 
-  const metrics=await getPackageRatingQuery(packageId)  
-
-  if (metrics.rows.length==0){
-
-    res.status(404).json({error:"Package doesn't exists"})
-    console.error(`package doesn't exist with id ${packageId}`)
+  if(isNaN(packageId)){
+    res.status(404).json({"error":"Package does not exist."})
     return
   }
 
-  
-  const packageRating = {
-    RampUp: metrics.rows[0].ramp_up,
-    Correctness: metrics.rows[0].correctness,
-    BusFactor: metrics.rows[0].bus_factor,
-    ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
-    LicenseScore: metrics.rows[0].license_score,
-    GoodPinningPractice: metrics.rows[0].good_pinning_practice,
-    PullRequest: metrics.rows[0].pull_request,
-    NetScore: metrics.rows[0].net_score,
-    RampUpLatency: metrics.rows[0].ramp_up_latency,
-    CorrectnessLatency: metrics.rows[0].correctness_latency,
-    BusFactorLatency: metrics.rows[0].bus_factor_latency,
-    ResponsiveMaintainerLatency:metrics.rows[0].responsive_maintainer_latency,
-    LicenseScoreLatency: metrics.rows[0].license_score_latency,
-    GoodPinningPracticeLatency: metrics.rows[0].good_pinning_practice_latency,
-    PullRequestLatency: metrics.rows[0].pull_request_latency,
-    NetScoreLatency: metrics.rows[0].net_score_latency,
-  };
- 
-  if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
-    ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice
-  ){
 
-    res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
+  console.log(`we are getting package rating for package id ${packageId}`)
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+    console.error(`Unauthorized: Token missing.`)
     return
   }
 
-  await insertToPackageHistoryRatingQuery(userId,"RATE",packageId)
 
-  res.status(200).json(packageRating)
+  try{
 
-  } catch (error) {
 
-    if (error instanceof Error&& error.name === 'TokenExpiredError') {
-      console.error('Token expired:', error);
-      res.status(403).json({ error: 'Token has expired.' });
-      return;
-    }
-    console.error('Error fetching package rating:', error);
-    if (error instanceof Error) {
-        res.status(500).json({ message: `Internal server error: ${error.message}` });
-    }
-    res.status(500).json({ message: 'Internal server error' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    const isAdmin=await checkIfIamAdmin(req)
+
+    const result=await canISearchQuery(userId)    
     
-}
-return 
+    if(result.rows.length==0&&isAdmin!=1){
+
+      res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
+      console.error(`no thing returned from the table for user ${userId}`)
+      return
+    }
+
+    const canISearchBool=result.rows[0].can_search
+    if(!canISearchBool && isAdmin!=1){
+
+      res.status(402).json({"error":"sorry you are not allowed to get the rating "})
+      console.error(`sorry you  ${userId} are not allowed to get the rating `)
+      return
+    }
+
+
+    const same_group_id=await canUserAccessPackageQuery(userId,packageId)
+
+    if(!same_group_id && isAdmin!=1){
+      res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
+      console.error(`sorry you are not allowed to get the rating of this package${userId}`)
+      return
+
+    }
+
+    const metrics=await getPackageRatingQuery(packageId)  
+
+    if (metrics.rows.length==0){
+
+      res.status(404).json({error:"Package doesn't exists"})
+      console.error(`package doesn't exist with id ${packageId}`)
+      return
+    }
+
+    
+    const packageRating = {
+      RampUp: metrics.rows[0].ramp_up,
+      Correctness: metrics.rows[0].correctness,
+      BusFactor: metrics.rows[0].bus_factor,
+      ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
+      LicenseScore: metrics.rows[0].license_score,
+      GoodPinningPractice: metrics.rows[0].good_pinning_practice,
+      PullRequest: metrics.rows[0].pull_request,
+      NetScore: metrics.rows[0].net_score,
+      RampUpLatency: metrics.rows[0].ramp_up_latency,
+      CorrectnessLatency: metrics.rows[0].correctness_latency,
+      BusFactorLatency: metrics.rows[0].bus_factor_latency,
+      ResponsiveMaintainerLatency:metrics.rows[0].responsive_maintainer_latency,
+      LicenseScoreLatency: metrics.rows[0].license_score_latency,
+      GoodPinningPracticeLatency: metrics.rows[0].good_pinning_practice_latency,
+      PullRequestLatency: metrics.rows[0].pull_request_latency,
+      NetScoreLatency: metrics.rows[0].net_score_latency,
+    };
+  
+    if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
+      ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice==-1
+    ){
+      console.log("chocked on at least one of the metrics")
+      res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
+      return
+    }
+
+    await insertToPackageHistoryRatingQuery(userId,"RATE",packageId)
+
+    res.status(200).json(packageRating)
+
+    } catch (error) {
+
+      if (error instanceof Error&& error.message === 'TokenExpiredError') {
+        console.error('Token expired:', error);
+        res.status(403).json({ error: 'Token has expired.' });
+        return;
+      }
+      console.error('Error fetching package rating:', error);
+      if (error instanceof Error) {
+          res.status(500).json({ message: `Internal server error: ${error.message}` });
+      }
+      res.status(500).json({ message: 'Internal server error' });
+      
+  }
+  return 
 
 }

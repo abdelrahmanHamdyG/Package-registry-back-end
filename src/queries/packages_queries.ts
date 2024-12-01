@@ -121,11 +121,11 @@ export const insertIntoPackageDataQuery = (
 };
 
 
-  export const resetRegistryQuery = (client:PoolClient) => {
+  export const resetRegistryQuery = async() => {
     const query = `
       TRUNCATE package CASCADE;
     `;
-    return client.query(query);
+    return await pool.query(query);
   };
 
 export const getPackageRatingQuery = (packageID: number) => {
