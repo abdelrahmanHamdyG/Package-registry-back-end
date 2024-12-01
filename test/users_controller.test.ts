@@ -251,7 +251,7 @@ describe("authenticate",()=>{
       });
       
 
-})
+}) 
 
 
 describe("logout",()=>{

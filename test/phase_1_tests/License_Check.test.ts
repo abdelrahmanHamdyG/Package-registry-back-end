@@ -18,7 +18,7 @@ describe('License Metrics', () => {
             .get('/repos/test-owner/test-repo/license')
             .reply(200, {
                 license: { spdx_id: 'MIT' }
-            });
+            }); 
 
             const licenseResult = await calculateGitHubLicenseMetric('test-owner', 'test-repo', process.env.GITHUB_TOKEN || '');
             expect(licenseResult.score).toBe(1); // MIT is a compatible license

@@ -45,7 +45,7 @@ describe('Bus Factor Calculations', () => {
 
       expect(busFactor).toBe(-1); // Error leads to -1 Bus Factor
       expect(latency).toBeGreaterThan(0);
-    });
+    }); 
   });
 
   describe('calculateNpmBusFactor', () => {

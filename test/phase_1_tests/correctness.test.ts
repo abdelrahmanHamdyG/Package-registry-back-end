@@ -14,7 +14,7 @@ describe('Correctness Metrics', () => {
     describe('GitHub Correctness', () => {
         it('should calculate correctness metric for a GitHub repository', async () => {
             // Mock GitHub issues endpoint
-            nock(GITHUB_API_URL)
+            nock(GITHUB_API_URL) 
             .get('/repos/test-owner/test-repo/issues')
             .query({ state: 'all' })  // Ensure the query matches exactly
             .reply(200, [
