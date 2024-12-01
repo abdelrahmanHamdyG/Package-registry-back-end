@@ -213,9 +213,6 @@ export const getUserAccess=async (req:Request,res:Response)=>{
 
   }
 
-  
-
-
 }
 
 

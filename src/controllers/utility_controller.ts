@@ -47,10 +47,6 @@ export const checkIfIamAdmin = async (req: Request)=>{
 };
 
 
-
-
-
-
 export const get_code_files=(dir:string):string[]=>{
 
     let files:string[] = [];
