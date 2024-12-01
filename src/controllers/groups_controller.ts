@@ -4,7 +4,7 @@ import { checkIfIamAdmin } from './utility_controller.js';
 import { assignPackageGroupQuery, checkGroupExistsQuery, doesGroupExistQuery, getAllGroupsQuery, getAllGroupsWithNameQuery, getUsersByGroupQuery, insertToGroupsQuery, insertUserToGroupQuery, isUserAlreadyInGroupQuery, updateUserGroupQuery } from '../queries/groups_queries.js';
 import { doesUserExistQuery } from '../queries/users_queries.js';
 import { checkPackageExistsQuery } from '../queries/packages_queries.js';
-
+import {log} from '../phase_1/logging.js'
 export const createGroup=async(req:Request,res:Response)=>{
 
     const {name}=req.body;
@@ -30,17 +30,17 @@ export const createGroup=async(req:Request,res:Response)=>{
   
     if(results.rows.length>0){
       res.status(400).json({error:"this group  already exists"})
-      console.error(`group with name ${name} already exists`)
+      log(`group with name ${name} already exists`)
       return 
     }
   
     try{
       const group=await insertToGroupsQuery(name)
-      console.log(`we inserted group ${name} with id ${group.rows[0].id}`)
+      log(`we inserted group ${name} with id ${group.rows[0].id}`)
       res.status(202).json({id:group.rows[0].id})  
     }catch(err){
       res.status(500).json({error:"internal server error"})
-      console.error(`internal server error`)
+      log(`internal server error`)
     }
     
 }
@@ -50,7 +50,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
   
     const groupId=parseInt(req.params.groupid,10)
     const {user_id}=req.body
-    console.log(`we are adding ${user_id} to group ${groupId}`)
+    log(`we are adding ${user_id} to group ${groupId}`)
 
 
     if (!groupId || !user_id) {
@@ -69,7 +69,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 
       if (isAdmin!=1) {
           res.status(403).json({ error: 'Only admins can assign users to group.' });
-          console.error(`you are not an admin`)
+          log(`you are not an admin`)
           return
       }
 
@@ -77,7 +77,7 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
       if (!groupExists) {
         
          res.status(404).json({ error: "Group does not exist" });
-         console.error(`group with id ${groupId} doesn't exists`)
+         log(`group with id ${groupId} doesn't exists`)
          return
       }
   
@@ -94,18 +94,18 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
   
          await updateUserGroupQuery(user_id,groupId)
          res.status(202).json({ message: `User assigned to a new group ${groupId}`});
-         console.log(`User ${user_id} assigned to a new group ${groupId}`)
+         log(`User ${user_id} assigned to a new group ${groupId}`)
          return
       }
       
       await insertUserToGroupQuery(user_id, groupId);
   
       res.status(201).json({ message: "User added to the group successfully" });
-      console.log(`user ${user_id} is added successfully to ${groupId}`)
+      log(`user ${user_id} is added successfully to ${groupId}`)
 
     } catch (error) {
 
-      console.error("Error adding user to group:", error);
+      log(`Error adding user to group:${error}`);
       res.status(500).json({ error: "Internal server error" });
     }
 };
@@ -113,21 +113,21 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 
 export const getAllGroups = async (req: Request, res: Response) => {
 
-    console.log("Getting all groups available...");
+    log("Getting all groups available...");
   
     const amIAdmin = await checkIfIamAdmin(req);
 
     if (amIAdmin === -1) {
 
       res.status(401).json({ error: "Token missing or invalid or expired" });
-      console.error("Token missing or invalid");
+      log("Token missing or invalid");
       return;
     }
   
     if (!amIAdmin) {
 
       res.status(403).json({ error: "Forbidden: Only admins can view all groups" });
-      console.error("User is not an admin");
+      log("User is not an admin");
       return;
     }
   
@@ -138,7 +138,7 @@ export const getAllGroups = async (req: Request, res: Response) => {
 
     } catch (error) {
 
-      console.error("Error fetching all groups:", error);
+      log(`Error fetching all groups:${error}`);
       res.status(500).json({ error: "Internal server error" });
     }
 };
@@ -147,13 +147,13 @@ export const getAllGroups = async (req: Request, res: Response) => {
   
 export const getUsersByGroup=async(req:Request,res:Response)=>{
   
-    console.log("we are getting user by groups ")
+    log("we are getting user by groups ")
     const groupId=parseInt(req.params.groupid ,10)
   
     if (!groupId){
   
       res.status(402).json({"error":"group id missing"})
-      console.log(`group id missing`)
+      log(`group id missing`)
       return 
   
     }
@@ -163,25 +163,25 @@ export const getUsersByGroup=async(req:Request,res:Response)=>{
     const amIAdmin = await checkIfIamAdmin(req);
     if (amIAdmin === -1) {
       res.status(401).json({ error: "Token missing or invalid or expired" });
-      console.error("Token missing or invalid");
+      log("Token missing or invalid");
       return;
     }
   
     if (!amIAdmin) {
       res.status(403).json({ error: "Forbidden: Only admins can view users by groups" });
-      console.error("User is not an admin");
+      log("User is not an admin");
       return;
     }
   
   
     const results=await getUsersByGroupQuery(groupId)
     res.status(202).json(results.rows)
-    console.log(`we got  users by Groups successfully`)
+    log(`we got  users by Groups successfully`)
     return 
     }catch(err){
   
       res.status(500).json({"error":`internal server error ${err}`})
-      console.log(`error happened while getting users by groups: ${err}`)
+      log(`error happened while getting users by groups: ${err}`)
   
     }
   
@@ -226,7 +226,7 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
       
       if (isAdmin!=1 ) {
           res.status(403).json({ error: 'Only admins can assign packages to group.' });
-          console.error(`you are not an admin`)
+          log(`you are not an admin`)
           return
       }
 
@@ -235,20 +235,20 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
       if(!checkGroupExistsFlag.rows.length||!checkPackageExistsFlag.rows.length){
 
           res.status(400).json({"error":"either group or package doesn't exists"})
-          console.log(`either group ${groupId} or package ${package_id} doesn't exists`)
+          log(`either group ${groupId} or package ${package_id} doesn't exists`)
           return 
 
       }
 
       await assignPackageGroupQuery(package_id,groupId)
       res.status(200).json({ message: "Package successfully assigned to group" });
-      console.log(`Package ${package_id} successfully assigned to ${groupId}`)
+      log(`Package ${package_id} successfully assigned to ${groupId}`)
       return 
 
 
     }catch(err){
 
-      console.error("Error assigning package to group:", err);
+      log(`Error assigning package to group:${err}`, );
       res.status(500).json({ error: "Internal server error" });
       return 
   

@@ -6,7 +6,7 @@ import pool from '../db.js';
 import { checkIfIamAdmin } from './utility_controller.js';
 import {  getAllUsersWithNameQuery, getUserAccessQuery, getUserWithUserNameQuery, insertToUserTokenQuery, insertUserToUsersQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
 import { doesGroupExistQuery, insertUserToGroupQuery } from '../queries/groups_queries.js';
-
+import {log} from '../phase_1/logging.js'
 
 
 
@@ -14,11 +14,11 @@ export const registerNewUser = async (req: Request, res: Response) => {
   
     const { name, password, isAdmin, groupId,canDownload=false,canSearch=false,canUpload=false } = req.body;
     
-    console.log(`Registering new user name:${name}`)
+    log(`Registering new user name:${name}`)
   
     if (!name || !password) {
        res.status(400).json({ error: 'Missing name or password.' });
-       console.error(`missing name or password`)
+       log(`missing name or password`)
        return
     }
   
@@ -32,7 +32,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
 
       if (isAdmin2==-1) {
          res.status(401).json({ error: 'Unauthorized: Token missing. or expired ' });
-         console.error(`token missing for user name :${name} maybe not admin`)
+         log(`token missing for user name :${name} maybe not admin`)
          return
       }
   
@@ -40,7 +40,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
         isAdmin2!=1
       ) {
          res.status(403).json({ error: 'Only admins can register users.' });
-         console.error(`you are not an admin`)
+         log(`you are not an admin`)
          return
       }
   
@@ -49,7 +49,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
   
       if (existingUserResult.rows.length > 0) {
          res.status(409).json({ error: 'User with this name already exists.' });
-         console.error(`user ${name} already exists`)
+         log(`user ${name} already exists`)
          return
       }
   
@@ -80,7 +80,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
       res.status(201).json({ message: 'User registered successfully.' });
     } catch (error) {
       await client.query('ROLLBACK'); 
-      console.error('Error during user registration:', error);
+      log(`Error during user registration:${error}`, );
       res.status(500).json({ error: 'Internal server error.' });
     } finally {
       client.release(); 
@@ -90,11 +90,11 @@ export const registerNewUser = async (req: Request, res: Response) => {
   
 export const authenticate = async (req: Request, res: Response) => {
     const { User, Secret } = req.body;
-    console.log(`we start authenticating with User ${User} and Secret: ${Secret}`)
+    log(`we start authenticating with User ${User} and Secret: ${Secret}`)
   
     if (!User || !User.name || !Secret || !Secret.password) {
       res.status(400).json({ error: 'There is missing field(s) in the AuthenticationRequest or it is formed improperly.' });
-      console.error(`missing user name or password`)
+      log(`missing user name or password`)
       return;
     }
   
@@ -102,7 +102,7 @@ export const authenticate = async (req: Request, res: Response) => {
       const result = await getAllUsersWithNameQuery(User.name);
       if (result.rows.length == 0) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        console.error(`userName ${User} is incorret`) 
+        log(`userName ${User} is incorret`) 
         return;
       }
   
@@ -112,7 +112,7 @@ export const authenticate = async (req: Request, res: Response) => {
       const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        console.error(`password for userName ${User} is incorret`)
+        log(`password for userName ${User} is incorret`)
         return;
       }
   
@@ -129,11 +129,11 @@ export const authenticate = async (req: Request, res: Response) => {
       
       // Insert the token into the user_tokens table
       await insertToUserTokenQuery(user.id, token, expirationDate.toISOString());
-      console.log(`we inserted the token`)
+      log(`we inserted the token`)
       // Send the token back to the user
       res.status(200).json({ token: `Bearer ${token}` });
     } catch (err) {
-      console.error('Error during authentication:', err);
+      log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
     }
   };
@@ -157,7 +157,7 @@ export const logout = async (req: Request, res: Response) => {
   
       res.status(200).json({ message: 'Logged out successfully.' });
     } catch (err) {
-      console.error('Error during logout:', err);
+      log(`Error during logout:${err}`);
       res.status(500).json({ error: 'Internal server error.' });
     }
 };
@@ -189,7 +189,7 @@ export const getUserAccess=async (req:Request,res:Response)=>{
   if(result.rows.length==0){
 
     res.status(402).json({error:"User Not Found"})
-    console.log(`user ${user_id} not found`)
+    log(`user ${user_id} not found`)
     return 
 
   }
@@ -197,14 +197,14 @@ export const getUserAccess=async (req:Request,res:Response)=>{
 
 
   res.status(202).json(result.rows)
-  console.log(`we get the acces for user ${user_id} sucessfull ` )
+  log(`we get the acces for user ${user_id} sucessfull ` )
   return
   
 
 
   }catch(error){
 
-    console.error('Error fetching package rating:', error);
+    log(`Error fetching package rating:error`);
     if (error instanceof Error) {
         res.status(500).json({ message: `Internal server error: ${error.message}` });
     }
@@ -261,11 +261,11 @@ export const updateUserAccess = async (req: Request, res: Response) => {
         user: result.rows[0],
       });
     } catch (err) {
-      console.error('Error updating user permissions:', err);
+      log(`Error updating user permissions:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
     }
   } catch (err) {
-    console.error('Error during permission update:', err);
+    log(`Error during permission update:err`);
     res.status(401).json({ error: 'Unauthorized: Invalid or expired token.' });
   }
 };

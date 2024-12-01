@@ -8,11 +8,11 @@ import path, { parse } from "path"
 import archiver from "archiver";
 import pool from '../db.js'; 
 import { Bool } from 'aws-sdk/clients/clouddirectory.js';
+import {log} from '../phase_1/logging.js'
 
 
 
-// import { Pool } from 'pg';
-// const pool = new Pool();
+
 let adj_list = new Map<string, {strings: Set<string>, num: number}>();
 
 export const checkIfIamAdmin = async (req: Request)=>{
@@ -41,7 +41,7 @@ export const checkIfIamAdmin = async (req: Request)=>{
         return 0
   } catch (error) {
     
-    console.error("Token verification failed:", error);
+    log(`Token verification failed:${error}`);
     return -1; // Invalid token
   }
 };
@@ -93,7 +93,7 @@ export const debloat_file=async (dir:string)=>{
       const minified = await minify(code);
       fs.writeFileSync(filePath, minified.code || code); // Fallback to original if minification fails
     } catch (error) {
-      // console.error(`Error minifying ${filePath}:`, error);
+      // log(`Error minifying ${filePath}:`, error);
     }
   }
 }
@@ -103,7 +103,6 @@ export const debloat_file=async (dir:string)=>{
 
 export const get_npm_adjacency_list = async (packageName: string) => {
   const url = `https://registry.npmjs.org/${packageName}`;
-  console.log(url)
   try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -138,7 +137,7 @@ export const get_npm_adjacency_list = async (packageName: string) => {
       }
   } catch (error) {
       if (error instanceof Error) {
-          console.error(error.message);
+          log(error.message);
       }
   }
 };
@@ -180,7 +179,7 @@ export const fetch_package_size = async (packageName: string): Promise<number> =
 
         return size; // Size in bytes
     } catch (error) {
-        console.error(`Error fetching size for ${packageName}:`, error);
+        log(`Error fetching size for ${packageName}:${error}` );
         return 0; // Return 0 if there's an error
     }
 };
@@ -192,7 +191,7 @@ export const printingTheCost=async (package_name:string,flag:Bool)=>{
   
   calculate_cost(package_name)
   for(const pack of adj_list.keys()){
-    console.log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
+    log(`${pack}the standAlone Cost:${adj_list.get(pack)!.num} and the Total Cost:${cost.get(pack)}`)
   }
   
 
@@ -217,18 +216,18 @@ export const get_repo_url=async(package_name:string)=>{
 export const githubPackagejson= async (url: string)=>{
   try{
     const repoData=await fetch(url)
-    console.log(` repo data :${repoData}`)
+    log(` repo data :${repoData}`)
     const repoName=getGitHubRepoNameFromUrl(url) as string
     
     if(!repoData.ok){
       throw new Error(`Could not fetch data for github url: ${url}`);
     }
     const findindBranch=await repoData.json()
-    console.log(`findind branch: ${findindBranch}`)
+    log(`findind branch: ${findindBranch}`)
     const sizeInKb = findindBranch.size
     const defaultBranch= findindBranch.default_branch
     const packagejsonURL=`url+/${defaultBranch}/package.json`
-    console.log(`the package Json URL is ${packagejsonURL}`)
+    log(`the package Json URL is ${packagejsonURL}`)
     const packagejsonResponse=await fetch(packagejsonURL)
     if(!packagejsonResponse.ok){
       throw new Error(`Could not fetch data for the package.json of github url: ${url}`);
@@ -245,7 +244,7 @@ export const githubPackagejson= async (url: string)=>{
   }
   
   catch (error) {
-    console.error("Error:", error);
+    log(`Error: ${error}`);
   }
  
 }
@@ -254,7 +253,7 @@ export const getGitHubRepoNameFromUrl = (url: string): string | null => {
   const regex = /github\.com[\/:](.+?)\/([^\/]+)/;
   
   const match = url.match(regex);
-  console.log("we are heerrrr")
+  log("we are heerrrr")
   if (match) {
       return match[2]; // Return the repository name (second capture group)
   }
@@ -274,7 +273,7 @@ export  const trackDetails=(req:Request,res:Response)=>{
     
     res.status(200).json({ plannedTracks });
   } catch (error) {
-    console.error('Error in /tracks endpoint:', error);
+    log(`Error in /tracks endpoint: ${error}`);
     res.status(500).json({ message: 'The system encountered an error while retrieving the student\'s track information.' });
   }
 
@@ -294,7 +293,7 @@ export const costOfGithubUrl= async (url:string, sizeInB: number,totaldependenci
   }
   
   catch (error) {
-    console.error("Error:", error);
+    log(`Error: ${error}`, );
   }
   
 }

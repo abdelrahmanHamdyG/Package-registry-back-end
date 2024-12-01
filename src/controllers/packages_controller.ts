@@ -13,6 +13,10 @@ import { checkIfIamAdmin, debloat_file, findPackageJson, get_npm_package_name, g
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageHistoryQuery, getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
+import {log} from '../phase_1/logging.js'
+
+
+
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
     const queries: Array<{ Name: string; Version: string }> = req.body;
@@ -26,7 +30,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       res.status(400).json({
         error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
       });
-      console.error('Invalid or missing fields in PackageQuery');
+      log('Invalid or missing fields in PackageQuery');
       return;
     }
 
@@ -36,7 +40,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   
     if(!token){
         res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
-        console.log(`token is missing`)
+        log(`token is missing`)
         return
     }
     
@@ -126,8 +130,8 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       queryText += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
       queryParams.push(limit, offset);
   
-      console.log(`The query is: ${queryText}`);
-      console.log(`Query parameters: ${queryParams}`);
+      log(`The query is: ${queryText}`);
+      log(`Query parameters: ${queryParams}`);
   
       // Execute the combined query
       const result = await pool.query(queryText, queryParams);
@@ -137,7 +141,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
       res.status(200).json({ packages });
     } catch (error) {
-      console.error('Error executing query', error);
+      log(`Error executing query ${error}`, );
       res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -151,13 +155,13 @@ export const resetRegistry = async (req: Request, res: Response) => {
     
     if(isAdmin==-1){
       res.status(403).json({ error: "Authentication failed due to invalid or missing AuthenticationToken."});
-      console.error("not an admin");
+      log("not an admin");
       return;
       
     }
     if (isAdmin==0) {
       res.status(401).json({ error: "You do not have permission to reset the registry."});
-      console.error("not an admin");
+      log("not an admin");
       return;
     }
 
@@ -167,7 +171,7 @@ export const resetRegistry = async (req: Request, res: Response) => {
       res.status(200).json({error:'Registry is reset'});
     }
     catch (error) {
-      console.error('Error in reseting the registry:', error);
+      log(`eror in reseting the registry:${error}`, );
       res.status(500).json({ error: 'Internal Server Error' });
     }
 };
@@ -177,11 +181,11 @@ export const resetRegistry = async (req: Request, res: Response) => {
 
 export const uploadPackage = async (req: Request, res: Response) => {
   let { Name, Content, JSProgram, debloat, URL } = req.body;
-  console.log(`Uploading Package ${Name} `)
+  log(`Uploading Package ${Name} `)
 
   if ((!Content && !URL) || (Content && URL)) {
     res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-    console.error("Error: Invalid format of Content and URL");
+    log("Error: Invalid format of Content and URL");
     return;
   }
 
@@ -192,7 +196,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    console.error(`Unauthorized: Token missing.`)
+    log(`Unauthorized: Token missing.`)
     return
   }
 
@@ -211,7 +215,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
     if(!canIUploadFlag.rows[0].can_upload){
 
       res.status(400).json({"error":"sorry you don't have access to upload  "})
-      console.error(`sorry you don't have access to upload`)
+      log(`sorry you don't have access to upload`)
       return
   
     }
@@ -220,13 +224,13 @@ export const uploadPackage = async (req: Request, res: Response) => {
     const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
     const id:number = packageMetaData.rows[0].id;
     const key = `packages/${id}.zip`; 
-    console.log(`package ${Name} is with id:${id}`)
+    log(`package ${Name} is with id:${id}`)
 
 
     let dependencies=new Set<string>
     if (Content) {
       
-      console.log(`${Name} is uploaded by Content `)
+      log(`${Name} is uploaded by Content `)
       // it is uploaded by content
 
       // reading the buffer writing it to the device 
@@ -244,7 +248,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
       if (debloat) {
         await debloat_file(path_after_unzipping); // Use your debloat/minification function
-        console.log(`we debloated the package ${Name} successfuly`)
+        log(`we debloated the package ${Name} successfuly`)
       }
 
 
@@ -257,13 +261,13 @@ export const uploadPackage = async (req: Request, res: Response) => {
       await uploadBase64ToS3(base64FinalContent,  key);
 
 
-      console.log(`we uploaded ${Name} to S3 `)
+      log(`we uploaded ${Name} to S3 `)
       
       await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
-      console.log(`we inserted ${Name} to PackageData `)
+      log(`we inserted ${Name} to PackageData `)
 
       await insertPackageRatingQuery(client,id);
-      console.log(`we inserted ${Name} to Package Rating with default values as it is content`)
+      log(`we inserted ${Name} to Package Rating with default values as it is content`)
 
 
       res.status(201).json({
@@ -277,7 +281,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
           JSProgram:JSProgram
         }
       });
-      console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
+      log(`Package ${Name} version 1.0.0 uploaded successfully`);
 
       if (fs.existsSync(path_after_unzipping)) 
         fs.rmSync(path_after_unzipping, { recursive: true, force: true });
@@ -299,15 +303,15 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
       
       const metrics=await processUrl(URL)
-      console.log(`Metics Calculated for ${URL}: `)
-      console.log(metrics)
+      log(`Metics Calculated for ${URL}: `)
+      
       if ((metrics?.NetScore||0)<0.5){
 
         res.status(424).json({"error":"disqualified package"})
-        console.log(`Package ${Name} is disqualified`)
+        log(`Package ${Name} is disqualified`)
         return 
       }
-      console.log(`Package ${Name} is qualified`)
+      log(`Package ${Name} is qualified`)
       
       await insertPackageRatingQuery(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
         ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
@@ -316,30 +320,30 @@ export const uploadPackage = async (req: Request, res: Response) => {
         ?.License_Latency,-1,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
 
       );
-      console.log(`we insert the rating of Package ${Name}`)
+      log(`we insert the rating of Package ${Name}`)
 
       
 
        if(!URL.includes("github")){
       
-         console.log(`${URL} is an NPM repo`)
+         log(`${URL} is an NPM repo`)
 
 
          let package_name=get_npm_package_name(URL)
 
-         console.log(`${URL} Package Name is ${package_name}`)
+         log(`${URL} Package Name is ${package_name}`)
 
         
       
         
         URL=await get_repo_url(package_name)
-        console.log(`the github repo of the package  is ${URL} `)
+        log(`the github repo of the package  is ${URL} `)
 
 
         
       }
 
-      console.log(`we are cloning the packge ${URL}`)
+      log(`we are cloning the packge ${URL}`)
 
       const tempDir = path.join(os.tmpdir(), `repo-${id}`);
       fs.mkdirSync(tempDir, { recursive: true });
@@ -352,13 +356,13 @@ export const uploadPackage = async (req: Request, res: Response) => {
           singleBranch: true,
           depth: 1,
       })
-      console.log(`we cloned ${URL} successfully`)
+      log(`we cloned ${URL} successfully`)
 
 
       // const repoSizeInBytes = getDirectorySize(tempDir);
       // const packageJsonPath = findPackageJson(tempDir);
       // if (packageJsonPath) {
-      //   // console.log(`Found package.json at: ${packageJsonPath}`);
+      //   // log(`Found package.json at: ${packageJsonPath}`);
 
       //   // Read and parse package.json to get dependencies
       //   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -370,7 +374,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       //   // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
       // }
       // else{
-      //   console.error('error getting the dependencies');
+      //   log('error getting the dependencies');
       // }
 
       if(debloat){
@@ -380,19 +384,19 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
       const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       await zipDirectory(tempDir, zipPath);
-      console.log(`Zipped repository to ${zipPath}`);
+      log(`Zipped repository to ${zipPath}`);
       const fileStream = fs.createReadStream(zipPath);
 
 
       uploadZipToS3(key,fileStream,'application/zip')
-      console.log(`we uploaded ${URL} to S3 Successfully `)
+      log(`we uploaded ${URL} to S3 Successfully `)
 
 
       const zipFileContent = fs.readFileSync(zipPath);
       const base64Content = zipFileContent.toString('base64');
 
       await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
-      console.log(`we inserted ${URL} to PackageData Successfully `)
+      log(`we inserted ${URL} to PackageData Successfully `)
 
 
       res.status(201).json({
@@ -424,16 +428,16 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
     await client.query('ROLLBACK');
 
-    console.error(`Error in uploading package: ${Name}`, error);
+    log(`Error in uploading package: ${Name} ${error}` );
     
     if (error  instanceof Error&& error.name === 'TokenExpiredError') {
-      console.error('Token expired:', error);
+      log(`Token expired:${error}` );
       res.status(401).json({ error: 'Token has expired.' });
       return;
     }
   
     if ((error as any).code === '23505') {
-      console.error('Error in uploading package:', error);
+      log(`Error in uploading package:${error}`);
       res.status(409).json({ error: 'Package exists already.' });
     } else {
       res.status(500).json({ error: 'Internal server error' });
@@ -447,7 +451,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
 };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
-  console.log("here")
+  log("here")
   const idRead =req.params.id
 
   const regex = /^[a-zA-Z0-9\-]+$/;
@@ -463,16 +467,16 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     res.status(404).json({"error":"Package does not exist."})
     return
   }
-  console.log(`getPackageByID called with ${id}`);
+  log(`getPackageByID called with ${id}`);
 
   const authHeader = req.headers['authorization'];
-  console.log(`auth header is ${authHeader}`)
+  log(`auth header is ${authHeader}`)
   const token = authHeader && authHeader.split(' ')[1];
-  console.log(`token  is ${authHeader}`)
+  log(`token  is ${authHeader}`)
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    console.error(`Unauthorized: Token missing.`)
+    log(`Unauthorized: Token missing.`)
     return
   }
 
@@ -494,7 +498,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     const userId = decoded.sub;
     
     
-    console.log(`my user Id is ${userId}`)
+    log(`my user Id is ${userId}`)
     
     await client.query("BEGIN");
     // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
@@ -504,55 +508,54 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     if(result.rows.length==0&&isAdmin!=1){
 
-      console.error(`no thing returned from the table for user ${userId}`)
+      log(`no thing returned from the table for user ${userId}`)
       res.status(500).json({"error":"Internal Server erorr"})
       
       return
     }
     
     const canIReadBool=result.rows[0]
-    console.log(canIReadBool)
+    log(canIReadBool)
     if(!canIReadBool.can_download&&isAdmin!=1){
 
       res.status(405).json({"error":"sorry you don't have access to download this package "})
-      console.error(`sorry you don't have access to download this package as ${userId}`)
+      log(`sorry you don't have access to download this package as ${userId}`)
       return
     }
 
     
-    console.log(`User ${userId} can download packages `)
+    log(`User ${userId} can download packages `)
 
     const package_data = await getPackageByIDQuery(client, id);
 
-    console.log("we got the package by ID ")
+    log("we got the package by ID ")
     if (package_data.rows.length === 0) {
-      console.error(`Package with id:${id} doesn't exist`);
+      log(`Package with id:${id} doesn't exist`);
       await client.query("ROLLBACK");
       res.status(404).json({ error: "Package doesn't exist" });
       return;
     }
 
-    console.log(package_data.rows[0])
+    log(package_data.rows[0])
     
     if(package_data.rows[0].group_id ){
-      console.log("we are here1 ")
+      log("we are here1 ")
       const userGroupResults=await getUserGroupQuery(userId)
-      console.log(userGroupResults)
-      console.log(userGroupResults.rows[0])
+      
 
 
       if(userGroupResults.rows.length==0&&isAdmin!=1){
         res.status(405).json({"error":"sorry you don't have access to download this package "})
-        console.error(`sorry you don't have access to download this package as ${userId}`)
+        log(`sorry you don't have access to download this package as ${userId}`)
         return 
       }
-      // console.log("we are here 2")
+      // log("we are here 2")
       
       if(isAdmin!=1){
         
         if(userGroupResults.rows[0].length==0&&package_data.rows[0].group_id){
           res.status(405).json({"error":"sorry you don't have access to download this package "})
-          console.error(`sorry you don't have access to download this package as ${userId}`)
+          log(`sorry you don't have access to download this package as ${userId}`)
           return 
         }
         
@@ -560,7 +563,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
             if((package_data.rows[0].group_id)&&userGroupResults.rows[0].group_id!=package_data.rows[0].group_id ){
               res.status(405).json({"error":"sorry you don't have access to download this package "})
-              console.error(`sorry you don't have access to download this package as ${userId}`)
+              log(`sorry you don't have access to download this package as ${userId}`)
               return 
             }
 
@@ -571,12 +574,12 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
 
     const current_data = package_data.rows[0];
-    console.log(`we found the package with id:${id}`)
+    log(`we found the package with id:${id}`)
 
     // Read from S3
     const key = `packages/${id}.zip`;
     const zipFileContent = await downloadFromS3(key);
-    console.log(`Downloaded package successfully from S3 for id: ${id}`);
+    log(`Downloaded package successfully from S3 for id: ${id}`);
     
     await insertToPackageHistoryQuery(userId,"DOWNLOAD",id,client)
     await client.query("COMMIT");
@@ -599,12 +602,12 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     await client.query("ROLLBACK");
 
     if (err  instanceof Error&& err.message === 'TokenExpiredError') {
-      console.error('Authentication failed due to invalid or missing AuthenticationToken.', err);
+      log(`Authentication failed due to invalid or missing AuthenticationToken.${err}`, );
       res.status(403).json({ error: 'Token has expired.' });
       return;
     }
 
-    console.error(`Error in getting package by ID ${id}: `, err);
+    log(`Error in getting package by ID ${id}: ${err}`, );
 
     res.status(500).json({ error: 'Internal Server Error' });
 
@@ -617,12 +620,12 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 export const searchPackageByRegex = async (req: Request, res: Response) => {
 const { RegEx } = req.body;
 
-console.log(`Searching package by Regext with ${RegEx} called`)
+log(`Searching package by Regext with ${RegEx} called`)
 
 
 if (!RegEx) {
   res.status(400).json({ error: "There is missing field(s) in the PackageRegEx or it is formed improperly, or is invalid"});
-  console.error("Error: There is no Regex");
+  log("Error: There is no Regex");
   return;
 }
 
@@ -634,7 +637,7 @@ const token = authHeader && authHeader.split(' ')[1];
 
 if (!token) {
   res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-  console.error(`Unauthorized: Token missing.`)
+  log(`Unauthorized: Token missing.`)
   return
 }
 
@@ -643,7 +646,7 @@ try {
   const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
   const userId = decoded.sub;
   const isAdmin=await checkIfIamAdmin(req)
-  console.log(`isAdmin: ${isAdmin}`)
+  log(`isAdmin: ${isAdmin}`)
   if(isAdmin!=1){
     const canISearchFlag=await canISearchQuery(userId)
     
@@ -651,7 +654,7 @@ try {
     if (!canISearchFlag.rows[0].can_search){
       
       res.status(405).json({"error":"sorry you don't have access to search with this regex "})
-      console.error(`sorry you don't have access to search about package as ${userId}`)
+      log(`sorry you don't have access to search about package as ${userId}`)
       return
     }
 
@@ -661,7 +664,7 @@ try {
 
     if(packageMetaData.rows.length===0){
       res.status(404).json({error: "No package found under this regex "});
-      console.error(`Error: There is no package for that Regex ${RegEx}`);
+      log(`Error: There is no package for that Regex ${RegEx}`);
       return; 
     }
 
@@ -684,12 +687,12 @@ try {
   }else{
 
     // he is an admin
-    console.log(`I am an admin`)
+    log(`I am an admin`)
     const packageMetaData = await searchPackagesByRegExQueryForAdminQuery(client,RegEx);
 
     if(packageMetaData.rows.length===0){
       res.status(404).json({error: "No package found under this regex "});
-      console.error(`Error: There is no package for that Regex ${RegEx}`);
+      log(`Error: There is no package for that Regex ${RegEx}`);
       return; 
     }
 
@@ -720,11 +723,11 @@ try {
 catch (error) {
 
   if (error  instanceof Error&& error.name === 'TokenExpiredError') {
-    console.error('Token expired:', error);
+    log(`Token expired:${error}` );
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     return;
   }
-  console.error(`Error in searching by Regex: ${RegEx} `, error);
+  log(`Error in searching by Regex: ${RegEx} ${error}` );
   res.status(500).json({ error: 'Internal Server Error' });
 } finally {
   client.release();      
@@ -740,7 +743,7 @@ const { metadata, data } = req.body;
 const { Name, Version } = metadata || {}; 
 const { Content, URL, debloat,JSProgram } = data || {};
 const client = await pool.connect();
-console.log(`package id is ${packageId}`)
+log(`package id is ${packageId}`)
 //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
 const returnedNameWithoutRows=(await (getNameVersionByIdQuery(client,packageId)))
 if(returnedNameWithoutRows.rows.length==0){
@@ -769,8 +772,8 @@ if(latestPackageUrl&&!URL){
 }
 
 
-console.log(`latest verion is ${latestVersionBeforeSplit}`)
-console.log(`latestVersion MaxVersion is ${latestVersionBeforeSplit.maxversion}`)
+log(`latest verion is ${latestVersionBeforeSplit}`)
+log(`latestVersion MaxVersion is ${latestVersionBeforeSplit.maxversion}`)
 const update_version = Version.split('.').map(Number);
 const latestVersion = (latestVersionBeforeSplit.maxversion).split('.').map(Number);
 let result=1;
@@ -779,9 +782,9 @@ if (update_version[2] < latestVersion[2]){
      result = -1;
   }
 if ((!Content && !URL) || (Content && URL)|| !Name ||!Version  ||(returnedName!=Name) ) {
-  console.log(`Name is ${Name} returned name is ${returnedName}`)
+  log(`Name is ${Name} returned name is ${returnedName}`)
   res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-  console.error("Error: Invalid format of Content and URL");
+  log("Error: Invalid format of Content and URL");
   return;
 }
 if(result==-1){
@@ -794,7 +797,7 @@ else{
     const packageMetaData = await insertPackageQuery(client, Name, Version);
     const id= packageMetaData.rows[0].id;
     const key = `packages/${id}.zip`; // Example key path
-    console.log(`id is ${id}`);
+    log(`id is ${id}`);
     let dependencies:string[]=[]
     if (Content) {
       
@@ -819,7 +822,7 @@ else{
           JSProgram:JSProgram
         }
       });
-      console.log(`Package ${Name} version${Version} uploaded successfully`);
+      log(`Package ${Name} version${Version} uploaded successfully`);
       
 
       
@@ -831,7 +834,7 @@ else{
 
       // Handle cases where URL is used for ingestion instead of Content
 
-      console.log("we are cloning ")
+      log("we are cloning ")
       const tempDir = path.join(os.tmpdir(), `repo-${id}`);
       fs.mkdirSync(tempDir, { recursive: true });
 
@@ -844,10 +847,10 @@ else{
           depth: 1,
 
       })
-      console.log("we cloned successfully")
+      log("we cloned successfully")
       const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       await zipDirectory(tempDir, zipPath);
-      console.log(`Zipped repository to ${zipPath}`);
+      log(`Zipped repository to ${zipPath}`);
       const fileStream = fs.createReadStream(zipPath);
       uploadZipToS3(key,fileStream,'application/zip')
 
@@ -883,7 +886,7 @@ else{
     }
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error in uploading package:', error);
+    log(`Error in uploading package:${error}` );
     res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     client.release();
@@ -898,12 +901,12 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
   const {id}=req.body
 
-  console.log(`we are getting package history for package ${id}`)
+  log(`we are getting package history for package ${id}`)
 
 
   if(!id){
     res.status(401).json({error:"id missing "})
-    console.log(`id ${id} missing`)
+    log(`id ${id} missing`)
     return
   }
 
@@ -912,7 +915,7 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
   if (!token) {
     res.status(401).json({ error: 'Unauthorized: Token missing.' });
-    console.error(`Unauthorized: Token missing.`)
+    log(`Unauthorized: Token missing.`)
     return
   }
 
@@ -924,7 +927,7 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
     if(isAdmin==-1){
         res.status(402).json({error:"token not found"})
-        console.log(`token not found`)
+        log(`token not found`)
         return
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
@@ -934,18 +937,18 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
     if(isAdmin==0){
 
       res.status(403).json({error:"Only admins are allowed to view package history"})
-      console.log(`he is not an admin`)
+      log(`he is not an admin`)
       return
     }
 
-    console.log(`you are an admin`)
+    log(`you are an admin`)
 
     const doesPackageExists=await checkPackageExistsQuery(id)
 
     if(doesPackageExists.rows.length==0){
 
       res.status(404).json({error:"package doesn't exists"})
-      console.log(`package with id ${id} doesn't exists`)
+      log(`package with id ${id} doesn't exists`)
       return
     }
 
@@ -954,11 +957,11 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
     if (history.rows.length === 0) {
       res.status(405).json({ error: "No history found for the specified package" });
-      console.log(`No history found for package with ID ${id}`);
+      log(`No history found for package with ID ${id}`);
       return;
     }
 
-    console.log(`Returning package history for package ${id}`);
+    log(`Returning package history for package ${id}`);
     res.status(200).json(history.rows);
     return
 
@@ -966,11 +969,11 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 
     if (error  instanceof Error&& error.name === 'TokenExpiredError') {
-      console.error('Token expired:', error);
+      log(`Token expired:${error}`, );
       res.status(401).json({ error: 'Token has expired.' });
       return;
     }
-    console.log(`error in getting package ${id} history ${error}`)
+    log(`error in getting package ${id} history ${error}`)
     res.status(500).json({ error: 'Internal server error' });
     return 
   }
@@ -1001,13 +1004,13 @@ export const getPackageRating=async (req:Request,res:Response)=>{
   }
 
 
-  console.log(`we are getting package rating for package id ${packageId}`)
+  log(`we are getting package rating for package id ${packageId}`)
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    console.error(`Unauthorized: Token missing.`)
+    log(`Unauthorized: Token missing.`)
     return
   }
 
@@ -1025,7 +1028,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(result.rows.length==0&&isAdmin!=1){
 
       res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
-      console.error(`no thing returned from the table for user ${userId}`)
+      log(`no thing returned from the table for user ${userId}`)
       return
     }
 
@@ -1033,7 +1036,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(!canISearchBool && isAdmin!=1){
 
       res.status(402).json({"error":"sorry you are not allowed to get the rating "})
-      console.error(`sorry you  ${userId} are not allowed to get the rating `)
+      log(`sorry you  ${userId} are not allowed to get the rating `)
       return
     }
 
@@ -1042,7 +1045,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
     if(!same_group_id && isAdmin!=1){
       res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
-      console.error(`sorry you are not allowed to get the rating of this package${userId}`)
+      log(`sorry you are not allowed to get the rating of this package${userId}`)
       return
 
     }
@@ -1052,7 +1055,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if (metrics.rows.length==0){
 
       res.status(404).json({error:"Package doesn't exists"})
-      console.error(`package doesn't exist with id ${packageId}`)
+      log(`package doesn't exist with id ${packageId}`)
       return
     }
 
@@ -1079,7 +1082,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
       ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice==-1
     ){
-      console.log("chocked on at least one of the metrics")
+      log("chocked on at least one of the metrics")
       res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
       return
     }
@@ -1091,11 +1094,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     } catch (error) {
 
       if (error instanceof Error&& error.message === 'TokenExpiredError') {
-        console.error('Token expired:', error);
+        log(`Token expired:${error}` );
         res.status(403).json({ error: 'Token has expired.' });
         return;
       }
-      console.error('Error fetching package rating:', error);
+      log(`Error fetching package rating:${error}`, );
       if (error instanceof Error) {
           res.status(500).json({ message: `Internal server error: ${error.message}` });
       }
