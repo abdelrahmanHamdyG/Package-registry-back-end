@@ -16,6 +16,7 @@ import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery
 import {log} from '../phase_1/logging.js'
 
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
+import { Client } from 'pg';
 
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
@@ -995,56 +996,110 @@ export const updatePackage = async (req: Request, res: Response) => {
   const { Name, Version } = metadata || {}; 
   const { Content, URL, debloat,JSProgram } = data || {};
   const client = await pool.connect();
-  let adj_list = new Map<string, { strings: Set<string>; num: number }>();
-  console.log(`package id is ${packageId}`)
-  //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
-  const returnedNameWithoutRows=(await (getNameVersionByIdQuery(client,packageId)))
-  if(returnedNameWithoutRows.rows.length==0){
 
-    res.status(400).json({error:"package doesn't exist" });
-    return;
-  }
-
-  const returnedName=returnedNameWithoutRows.rows[0].name
-
-
-  const latestPackage=(await(getLatestPackageQuery(client,packageId))).rows[0]
-  const latestVersionBeforeSplit=latestPackage.version
-  const latestPackageUrl=latestPackage.url
+  try{
+    let adj_list = new Map<string, { strings: Set<string>; num: number }>();
+    log(`package id is ${packageId}`)
+    //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
 
   
-  if(!latestPackageUrl&&URL){
-
-    res.status(400).json({error:"you can't change the way you upload the package with it has to be using content"});
-    return;
-  }
-
-  if(latestPackageUrl&&!URL){
-    res.status(400).json({error:"you can't change the way you upload the package with it has to be using URL"});
-    return;
-  }
-
-
-  console.log(`latest verion is ${latestVersionBeforeSplit}`)
-  const update_version = Version.split('.').map(Number);
-  const latestVersion = latestVersionBeforeSplit.split('.').map(Number);
-  let result=1;
-     // updated Version is the latest
-  if (update_version[2] < latestVersion[2]){
-       result = -1;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+      res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+      log(`Unauthorized: Token missing.`)
+      return
     }
-  if ((!Content && !URL) || (Content && URL)|| !Name ||!Version  ||(returnedName!=Name) ) {
-    console.log(`Name is ${Name} returned name is ${returnedName}`)
-    res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-    console.error("Error: Invalid format of Content and URL");
-    return;
-  }
-  if(result==-1){
-    res.status(300).json({error:'the updated is outdated so no thing to do'});
-    return;
-  }
-  else{
-    try {
+    
+    const isAdmin=await checkIfIamAdmin(req)
+
+
+    if(isAdmin==-1){
+      res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
+      log("can I uploadFlag return null")
+      return
+    }
+
+
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+    
+    
+    const canIUploadFlag=await canIUploadQuery(userId)
+
+    if(canIUploadFlag.rows.length==0){
+      res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
+      log("can I uploadFlag return null")
+      return
+    }    
+
+    if(canIUploadFlag.rows[0].can_upload&& isAdmin!=1){
+
+        res.status(405).json({error:"you are not allowed update packages"})
+        log("not admin  and can I upload flag =0")
+        return
+    }
+
+
+    const canAccess=await canUserAccessPackageQuery(userId,packageId)
+
+    if(!canAccess&&isAdmin!=1){
+      res.status(405).json({error:"you are now allowd to update this package"})
+      log("can update packages but this package outside his group ")
+      return 
+    }
+
+
+
+    const returnedNameWithoutRows=(await (getNameVersionByIdQuery(client,packageId)))
+
+    if(returnedNameWithoutRows.rows.length==0){
+
+      res.status(400).json({error:"package doesn't exist" });
+      return;
+    }
+
+    const returnedName=returnedNameWithoutRows.rows[0].name
+
+
+    const latestPackage=(await(getLatestPackageQuery(client,packageId))).rows[0]
+    const latestVersionBeforeSplit=latestPackage.version
+    const latestPackageUrl=latestPackage.url
+
+    
+    if(!latestPackageUrl&&URL){
+
+      res.status(400).json({error:"you can't change the way you upload the package with it has to be using content"});
+      return;
+    }
+
+    if(latestPackageUrl&&!URL){
+      res.status(400).json({error:"you can't change the way you upload the package with it has to be using URL"});
+      return;
+    }
+
+
+    console.log(`latest verion is ${latestVersionBeforeSplit}`)
+    const update_version = Version.split('.').map(Number);
+    const latestVersion = latestVersionBeforeSplit.split('.').map(Number);
+    let result=1;
+      // updated Version is the latest
+    if (update_version[2] < latestVersion[2]){
+        result = -1;
+      }
+    if ((!Content && !URL) || (Content && URL)|| !Name ||!Version  ||(returnedName!=Name) ) {
+      console.log(`Name is ${Name} returned name is ${returnedName}`)
+      res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
+      console.error("Error: Invalid format of Content and URL");
+      return;
+    }
+    if(result==-1){
+      res.status(300).json({error:'the updated is outdated so no thing to do'});
+      return;
+    }
+    
+      
       await client.query('BEGIN');
       const packageMetaData = await insertPackageQuery(client, Name, Version);
       const id= packageMetaData.rows[0].id;
@@ -1053,13 +1108,13 @@ export const updatePackage = async (req: Request, res: Response) => {
       if (Content) {
       
         // now we need to deploat but first unzipping 
-  
+
         const content_as_base64=Buffer.from(Content,"base64")
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         fs.writeFileSync(zipPath, content_as_base64);
-  
-  
-  
+
+
+
         const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
@@ -1080,21 +1135,21 @@ export const updatePackage = async (req: Request, res: Response) => {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
           console.log("Debloated package contents.");
         }
-  
-  
+
+
         const debloat_package_zipped_path=path.join(os.tmpdir(), `debloated-package-${id}.zip`);
         await zipDirectory(path_after_unzipping,debloat_package_zipped_path)
-  
+
         const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
         const base64FinalContent = finalZipContent.toString('base64');
-  
-  
-  
-  
+
+
+
+
         
         
         await uploadBase64ToS3(base64FinalContent,  key);
-  
+
         
         await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
         await insertPackageRatingQuery(client,id);
@@ -1112,7 +1167,7 @@ export const updatePackage = async (req: Request, res: Response) => {
           }
         });
         console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
-  
+
         if (fs.existsSync(path_after_unzipping)) {
           fs.rmSync(path_after_unzipping, { recursive: true, force: true });
         }
@@ -1127,23 +1182,23 @@ export const updatePackage = async (req: Request, res: Response) => {
         await client.query('COMMIT');
       } else {
         // Handle cases where URL is used for ingestion instead of Content
-  
+
         // I am gonna do the rating first 
         const metrics=await processUrl(URL)
         console.log(metrics)
         if ((metrics?.NetScore||0)<0.5){
-  
+
           res.status(424).json({"error":"disqualified package"})
           return 
         }
-  
+
         
         await insertPackageRatingQuery(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
           ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
           ,-1,metrics?.CodeReview,metrics?.Correctness_Latency,metrics
           ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
           ?.License_Latency,-1,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
-  
+
         );
         const isnpm=!URL.includes("github")
           
@@ -1158,12 +1213,12 @@ export const updatePackage = async (req: Request, res: Response) => {
             let gitHubURL=await get_repo_url(package_name)
             
             console.log(`the got url is ${gitHubURL}`)
-           }
-  
+            }
+
           console.log("we are cloning ")
           const tempDir = path.join(os.tmpdir(),` repo-${id}`);
           fs.mkdirSync(tempDir, { recursive: true });
-  
+
         await  git.clone({
               fs,
               http,
@@ -1199,22 +1254,22 @@ export const updatePackage = async (req: Request, res: Response) => {
         if(debloat){
           await debloat_file(tempDir)
         }
-  
-  
+
+
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         await zipDirectory(tempDir, zipPath);
         console.log(`Zipped repository to ${zipPath}`);
         const fileStream = fs.createReadStream(zipPath);
         uploadZipToS3(key,fileStream,'application/zip')
-  
-  
+
+
         const zipFileContent = fs.readFileSync(zipPath);
         const base64Content = zipFileContent.toString('base64');
-  
+
         await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
         
-  
-  
+
+
         res.status(201).json({
           
           metadata:{
@@ -1227,7 +1282,8 @@ export const updatePackage = async (req: Request, res: Response) => {
             JSProgram:JSProgram
           }
         });
-  
+
+        await insertToPackageHistoryQuery(userId,"UPDATE",id,client)
         await client.query('COMMIT');
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
@@ -1235,15 +1291,15 @@ export const updatePackage = async (req: Request, res: Response) => {
         if (fs.existsSync(zipPath)) {
           fs.rmSync(zipPath);
         }
-  
-      } 
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error in uploading package:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-      client.release(); 
+
+        
+      
     }
+  }catch(err){
+    log(`internal server error ${err}`)
+    await client.query("ROLLBACK")
+    res.status(500).json({error:"internal server error"})
+    return 
   }
 };
 
