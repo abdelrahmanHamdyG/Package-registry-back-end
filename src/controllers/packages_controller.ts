@@ -340,18 +340,9 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
       const tempDir = path.join(os.tmpdir(), `repo-${id}`);
       fs.mkdirSync(tempDir, { recursive: true });
-      log(`we are cloning the packge ${URL}`)
+      
 
-      await  git.clone({
-            fs,
-            http,
-            dir:tempDir,
-            url: URL,
-            singleBranch: true,
-            depth: 1,
-        })
-        log(`we cloned ${URL} successfully`)
-
+      
       const isnpm=!URL.includes("github")
         
         if(isnpm){
@@ -370,11 +361,32 @@ export const uploadPackage = async (req: Request, res: Response) => {
           //FROM HERE
           await get_npm_adjacency_list(package_name,adj_list)
           printingTheCost(id,package_name,adj_list,client)
-          //UNTIL HERE
-          URL=await get_repo_url(package_name)
-          
+
+
+          log(`we are cloning the packge ${URL}`)
+          await  git.clone({
+            fs,
+            http,
+            dir:tempDir,
+            url: URL,
+            singleBranch: true,
+            depth: 1,
+        })
+        log(`we cloned ${URL} successfully`)
+
           
          }else{
+
+          log(`we are cloning the packge ${URL}`)
+            await  git.clone({
+              fs,
+              http,
+              dir:tempDir,
+              url: URL,
+              singleBranch: true,
+              depth: 1,
+          })
+          log(`we cloned ${URL} successfully`)
 
            
            Name=getGitHubRepoNameFromUrl(URL)
@@ -393,26 +405,11 @@ export const uploadPackage = async (req: Request, res: Response) => {
           
          }
 
-    
+
+      
 
 
-      // const repoSizeInBytes = getDirectorySize(tempDir);
-      // const packageJsonPath = findPackageJson(tempDir);
-      // if (packageJsonPath) {
-      //   // log(`Found package.json at: ${packageJsonPath}`);
-
-      //   // Read and parse package.json to get dependencies
-      //   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-
-      //   // Extract dependencies and devDependencies
-      //   const dependenciesSet = new Set(Object.keys(packageJson.dependencies))
-      //   const devDependenciesSet = new Set(Object.keys(packageJson.devDependencies))
-      //   // const totaldependencies= new Set([...devDependenciesSet, ...dependenciesSet])
-      //   // await costOfGithubUrl(URL,repoSizeInBytes,totaldependencies)
-      // }
-      // else{
-      //   log('error getting the dependencies');
-      // }
+     
 
       if(debloat){
 
@@ -1200,8 +1197,14 @@ export const updatePackage = async (req: Request, res: Response) => {
           ?.License_Latency,-1,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
 
         );
+
+
+        const tempDir = path.join(os.tmpdir(),` repo-${id}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+
         const isnpm=!URL.includes("github")
           
+          let gitHubURL=URL
           if(isnpm){
             console.log("not github")
             let package_name=get_npm_package_name(URL)
@@ -1210,24 +1213,14 @@ export const updatePackage = async (req: Request, res: Response) => {
             await get_npm_adjacency_list(package_name,adj_list)
             printingTheCost(id,package_name,adj_list,client)
             
-            let gitHubURL=await get_repo_url(package_name)
+            gitHubURL=await get_repo_url(package_name)
             
             console.log(`the got url is ${gitHubURL}`)
-            }
+          }
 
-          console.log("we are cloning ")
-          const tempDir = path.join(os.tmpdir(),` repo-${id}`);
-          fs.mkdirSync(tempDir, { recursive: true });
 
-        await  git.clone({
-              fs,
-              http,
-              dir:tempDir,
-              url: URL,
-              singleBranch: true,
-              depth: 1,
-          })
-          console.log("we cloned successfully")
+      
+          
           if (!isnpm) {
             const gitHubName = getGitHubRepoNameFromUrl(URL);
             if (!gitHubName) {
@@ -1250,7 +1243,18 @@ export const updatePackage = async (req: Request, res: Response) => {
             printingTheCost(id, gitHubName, adj_list, client);
           }
           
-        
+          console.log("we are cloning ")
+          await git.clone({
+            fs,
+            http,
+            dir:tempDir,
+            url: gitHubURL,
+            singleBranch: true,
+            depth: 1,
+        })
+        console.log("we cloned successfully")
+
+          
         if(debloat){
           await debloat_file(tempDir)
         }
