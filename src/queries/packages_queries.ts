@@ -28,7 +28,7 @@ WHERE
   return client.query(query, [packageID]);
 };
 
-export const getPackageNameByIDQuery = (client:PoolClient, packageID: number) => {
+export const getPackageNameByIDQuery = async (client:PoolClient, packageID: number) => {
   const query = `
     SELECT 
     name
@@ -37,7 +37,7 @@ FROM
 WHERE 
     id = $1;
   `;
-  return client.query(query, [packageID]);
+  return await client.query(query, [packageID]);
 };
 
 // Insert new package

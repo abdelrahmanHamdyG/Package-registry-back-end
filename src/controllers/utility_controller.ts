@@ -1,8 +1,10 @@
 // controller.ts
 import e, { Request, Response } from 'express';
 import axios from 'axios';
+
 import fs from 'fs'
 import {minify} from 'terser'
+import { promises as fss } from 'fs';
 import jwt from 'jsonwebtoken';
 import path, { parse } from "path"
 import archiver from "archiver";
@@ -402,6 +404,7 @@ export const getPackagesFromPackageJson=(dir: string): string[]=> {
   return packagesList;
 }
 export const getNameFromPackageJson=(dir: string): string=> {
+  log("We are getting the name from package.json")
   const packageJsonPath=getPackageJson(dir)
   let packageName = ''as string;
   if(packageJsonPath){
@@ -426,6 +429,7 @@ export const getNameFromPackageJson=(dir: string): string=> {
   else {
     console.error(`error`)
   }
+  log(`the returned name is ${packageName}`)
   return packageName;
 }
 
@@ -458,4 +462,15 @@ const getPackageJson=(dir: string): string | null=> {
   }
 
   return null; // Return null if 'package.json' is not found
+}
+
+
+export async function encodeFileToBase64(filePath:string) {
+  try {
+    const zipFileContent = await fss.readFile(filePath);
+    return zipFileContent.toString('base64'); // Return the Base64 string
+  } catch (error) {
+    console.error('Error reading or encoding file:', error);
+    throw error;
+  }
 }
