@@ -28,6 +28,18 @@ WHERE
   return client.query(query, [packageID]);
 };
 
+export const getPackageNameByIDQuery = (client:PoolClient, packageID: number) => {
+  const query = `
+    SELECT 
+    name
+FROM 
+    package 
+WHERE 
+    id = $1;
+  `;
+  return client.query(query, [packageID]);
+};
+
 // Insert new package
 export const insertPackageQuery = (
   client: PoolClient,

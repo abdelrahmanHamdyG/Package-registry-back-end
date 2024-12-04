@@ -13,10 +13,6 @@ import { PoolClient } from 'pg';
 import { insertPackageDependency } from '../queries/packages_queries.js';
 
 
-
-
-let adj_list = new Map<string, {strings: Set<string>, num: number}>();
-
 export const checkIfIamAdmin = async (req: Request)=>{
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -404,6 +400,33 @@ export const getPackagesFromPackageJson=(dir: string): string[]=> {
     console.error(`error`)
   }
   return packagesList;
+}
+export const getNameFromPackageJson=(dir: string): string=> {
+  const packageJsonPath=getPackageJson(dir)
+  let packageName = ''as string;
+  if(packageJsonPath){
+    if (fs.existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+        // Extract dependencies and devDependencies if they exist
+        if (packageJson.name ){
+          packageName=packageJson.name
+        }
+        else if (packageJson.Name){
+          packageName=packageJson.Name
+        }
+        else {
+          packageName="no name"
+          console.error('There is no name in package.json so we will use the name of the github repo or the name of the npm package');
+        }
+    } else {
+        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+    }
+  }
+  else {
+    console.error(`error`)
+  }
+  return packageName;
 }
 
 
