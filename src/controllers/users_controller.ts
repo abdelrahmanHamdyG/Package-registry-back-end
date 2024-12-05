@@ -7,6 +7,7 @@ import { checkIfIamAdmin } from './utility_controller.js';
 import {  getAllUsersWithNameQuery, getUserAccessQuery, getUserWithUserNameQuery, insertToUserTokenQuery, insertUserToUsersQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
 import { doesGroupExistQuery, insertUserToGroupQuery } from '../queries/groups_queries.js';
 import {log} from '../phase_1/logging.js'
+import { contentType } from 'mime-types';
 
 
 
@@ -112,7 +113,8 @@ export const authenticate = async (req: Request, res: Response) => {
       const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        log(`password for userName ${User} is incorret`)
+        console.log(`password is ${Secret.password}`)
+        log(`password for userName ${User.name} is incorret`)
         return;
       }
   
@@ -131,7 +133,9 @@ export const authenticate = async (req: Request, res: Response) => {
       await insertToUserTokenQuery(user.id, token, expirationDate.toISOString());
       log(`we inserted the token`)
       // Send the token back to the user
-      res.status(200).json({ token: `Bearer ${token}` });
+      res.type("text/plain");
+      
+      res.send( `Bearer ${token}` );
     } catch (err) {
       log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
@@ -141,7 +145,7 @@ export const authenticate = async (req: Request, res: Response) => {
   
 
 export const logout = async (req: Request, res: Response) => {
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers['x-authorization'] as string;
     const token = authHeader && authHeader.split(' ')[1];
   
     if (!token) {

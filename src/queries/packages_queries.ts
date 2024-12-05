@@ -134,9 +134,20 @@ export const insertIntoPackageDataQuery = (
 
 
   export const resetRegistryQuery = async() => {
-    const query = `
-      TRUNCATE package CASCADE;
-    `;
+     const query = `
+    -- Delete all data while preserving user_account with user_id = 30
+    DELETE FROM package_data WHERE package_id IN (SELECT id FROM package);
+    DELETE FROM package_dependencies WHERE package_id IN (SELECT id FROM package);
+    DELETE FROM package_rating WHERE package_id IN (SELECT id FROM package);
+    DELETE FROM package_history WHERE package_id IN (SELECT id FROM package);
+    DELETE FROM package;
+    DELETE FROM user_group_membership WHERE user_id != 30;
+    DELETE FROM user_groups WHERE id NOT IN (SELECT group_id FROM user_group_membership);
+    DELETE FROM user_tokens WHERE user_id != 30;
+    DELETE FROM user_account WHERE id != 30;
+  `;
+
+    ;
     return await pool.query(query);
   };
 

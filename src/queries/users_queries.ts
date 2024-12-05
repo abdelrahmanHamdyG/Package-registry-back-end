@@ -121,7 +121,7 @@ export const canUserAccessPackageQuery  = async (userId: number, packageId: numb
       return false; // Package not found or user doesn't have access
     } catch (error) {
       console.error(`Error checking access for user ${userId} to package ${packageId}:`, error);
-      throw new Error('Failed to check package access.');
+      return false
     }
   };
   

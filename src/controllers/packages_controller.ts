@@ -19,135 +19,141 @@ import {log} from '../phase_1/logging.js'
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 import { Client } from 'pg';
 
-
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
-    const queries: Array<{ Name: string; Version: string }> = req.body;
-    const offset: number = parseInt(req.query.offset as string) || 0;
-    let packages: any[] = [];
+  const queries: Array<{ Name: string; Version?: string }> = req.body;
+  const offset: number = parseInt(req.query.offset as string) || 0;
+  const packages: any[] = [];
   
+  console.log('Request body is', req.body);
+  console.log(`Request body is ${JSON.stringify(req.body)}`);
 
-    if (
-      !Array.isArray(queries) ||
-      queries.some((query) =>!query.Name || typeof query.Name !== 'string' || !query.Version || typeof query.Version !== 'string')) {
-      res.status(400).json({
-        error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
-      });
-      log('Invalid or missing fields in PackageQuery');
+  if (
+    !Array.isArray(queries) ||
+    queries.some(
+      (query) =>
+        !query.Name ||
+        typeof query.Name !== 'string' ||
+        (query.Version !== undefined && typeof query.Version !== 'string')
+    )
+  ) {
+    res.status(400).json({
+      error:
+        'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
+    });
+    console.log('Invalid or missing fields in PackageQuery');
+    return;
+  }
+
+  const authHeader = req.headers['x-authorization'] as string;
+  const token = authHeader && authHeader.split(' ')[1];
+  // Check if the user can search
+
+  if (!token) {
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+    console.log(`Token is missing`);
+    return;
+  }
+
+  let queryText = 'SELECT * FROM package';
+  const queryParams: (string | number)[] = [];
+  const conditions: string[] = [];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
+    const userId = decoded.sub;
+
+    const isAdmin = await checkIfIamAdmin(req);
+    const canISearchFlag = await canISearchQuery(userId);
+
+    if (canISearchFlag.rows.length === 0 && isAdmin !== 1) {
+      res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
       return;
     }
 
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    // check first if I can search 
-  
-    if(!token){
-        res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
-        log(`token is missing`)
-        return
+    if (!canISearchFlag.rows[0].can_search && isAdmin !== 1) {
+      res.status(405).json({ error: 'User not allowed to search' });
+      return;
     }
-    
-    
-    let queryText = 'SELECT * FROM package WHERE';
-    const queryParams: (string | number)[] = [];
-    const conditions: string[] = [];
-  
-    try {
-  
-      
-      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
-      const userId = decoded.sub;
-      
-  
-      const isAdmin=await checkIfIamAdmin(req)
-      const canISearchFlag=await canISearchQuery(userId)
-  
-      if(canISearchFlag.rows.length==0&&isAdmin!=1){
-  
-        res.status(403).json("Authentication failed due to invalid or missing AuthenticationToken.")
-        return
-      }
-  
-  
-      if(!canISearchFlag.rows[0].can_search){
-  
-        res.status(405).json("user not allowed to search")
-        return
-  
-      }
-  
-  
-  
-      for (let i = 0; i < queries.length; i++) {
-        const { Name, Version } = queries[i];
-  
-        if (Name === '*') {
-          conditions.push('TRUE'); // Matches all packages
-        } else {
-          let condition = `(name = $${queryParams.length + 1}`;
-          queryParams.push(Name);
-  
-          if (Version[0] === '~') {
+
+    for (let i = 0; i < queries.length; i++) {
+      const { Name, Version } = queries[i];
+
+      if (Name === '*') {
+        conditions.push('TRUE'); // Matches all packages
+      } else {
+        let condition = `(name = $${queryParams.length + 1}`;
+        queryParams.push(Name);
+
+        if (Version) {
+          // Handle Version specifications
+          if (Version.startsWith('~')) {
+            // Tilde version range
             const [major, minor] = Version.substring(1).split('.').map(Number);
             condition += ` AND version >= $${queryParams.length + 1} AND version < $${queryParams.length + 2}`;
             queryParams.push(`${major}.${minor}.0`, `${major}.${minor + 1}.0`);
-          } else if (Version[0] === '^') {
+          } else if (Version.startsWith('^')) {
+            // Carat version range
             const [major] = Version.substring(1).split('.').map(Number);
             condition += ` AND version >= $${queryParams.length + 1} AND version < $${queryParams.length + 2}`;
             queryParams.push(`${major}.0.0`, `${major + 1}.0.0`);
           } else if (Version.includes('-')) {
+            // Bounded range
             const [startVersion, endVersion] = Version.split('-').map(v => v.trim());
             condition += ` AND version >= $${queryParams.length + 1} AND version <= $${queryParams.length + 2}`;
             queryParams.push(startVersion, endVersion);
           } else {
+            // Exact version
             condition += ` AND version = $${queryParams.length + 1}`;
             queryParams.push(Version);
           }
-  
-          condition += ')';
-          conditions.push(condition);
-        }
-      }
-  
-      // Combine conditions with OR
-      queryText += ` ${conditions.join(' OR ')}`;
-      
-      if (!isAdmin) {
-        const userGroupResult = await getUserGroupQuery(userId);
-        let userGroupId = 456412
-        if (userGroupResult.rows.length != 0) {
-          
-          
-          userGroupId = userGroupResult.rows[0].group_id;  
-            
         }
 
-        queryText += ` AND (group_id = $${queryParams.length + 1} OR group_id IS NULL)`;
-        queryParams.push(userGroupId);
-  
-        
+        condition += ')';
+        conditions.push(condition);
       }
-  
-      // Add pagination with OFFSET and LIMIT for each page (let's set limit to 10 as an example)
-      const limit = 10;
-      queryText += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
-      queryParams.push(limit, offset);
-  
-      log(`The query is: ${queryText}`);
-      log(`Query parameters: ${queryParams}`);
-  
-      // Execute the combined query
-      const result = await pool.query(queryText, queryParams);
-      packages = result.rows;
-  
-      // Return response with packages and offset in headers
-      res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
-      res.status(200).json({ packages });
-    } catch (error) {
-      log(`Error executing query ${error}`, );
-      res.status(500).json({ error: 'Internal server error' });
     }
+
+    // Combine conditions with OR
+    if (conditions.length > 0) {
+      queryText += ` WHERE ${conditions.join(' OR ')}`;
+    }
+
+    if (!isAdmin) {
+      const userGroupResult = await getUserGroupQuery(userId);
+      let userGroupId = null;
+      if (userGroupResult.rows.length !== 0) {
+        userGroupId = userGroupResult.rows[0].group_id;
+      }
+
+      queryText += ` AND (group_id = $${queryParams.length + 1} OR group_id IS NULL)`;
+      queryParams.push(userGroupId);
+    }
+
+    // Add pagination with OFFSET and LIMIT
+    const limit = 10;
+    queryText += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
+
+    console.log(`The query is: ${queryText}`);
+    console.log(`Query parameters: ${queryParams}`);
+
+    // Execute the combined query
+    const result = await pool.query(queryText, queryParams);
+    const packages = result.rows.map(pkg => ({
+      Version: pkg.version,
+      Name: pkg.name,
+      ID: pkg.id.toString(), // Ensure ID is a string
+    }));
+        
+    // Return response with packages and offset in headers
+    res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
+    res.status(200).json({ packages });
+  } catch (error) {
+    console.log(`Error executing query: ${error}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
-  
+
   
   
 export const resetRegistry = async (req: Request, res: Response) => {
@@ -189,7 +195,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
     log("Error: Invalid format of Content and URL");
     return;
   }
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
@@ -423,7 +429,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
           ID:id
         },
         data:{
-          Content:"base64Content",
+          Content:base64Content,
           JSProgram:JSProgram
         }
       });
@@ -472,7 +478,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
   }
   log(`getPackageByID called with ${id}`);
 
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization'] as string;
   log(`auth header is ${authHeader}`)
   const token = authHeader && authHeader.split(' ')[1];
   log(`token  is ${authHeader}`)
@@ -635,7 +641,7 @@ if (!RegEx) {
 
 const client = await pool.connect();
 
-const authHeader = req.headers['authorization'];
+const authHeader = req.headers['x-authorization'] as string;
 const token = authHeader && authHeader.split(' ')[1];
 
 if (!token) {
@@ -680,8 +686,9 @@ try {
       
         metadataList.push({
           metadata:{
-            Name:packName,
             Version:packVersion,
+            Name:packName,
+
             ID:packId
           }
         });
@@ -708,8 +715,8 @@ try {
       
         metadataList.push({
           metadata:{
-            Name:packName,
             Version:packVersion,
+            Name:packName,
             ID:packId
           }
         });
@@ -731,7 +738,7 @@ catch (error) {
     return;
   }
   log(`Error in searching by Regex: ${RegEx} ${error}` );
-  res.status(500).json({ error: 'Internal Server Error' });
+  res.status(404).json({ error: 'Internal Server Error' });
 } finally {
   client.release();      
 }
@@ -753,7 +760,7 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
     return
   }
 
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization']as string;
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
@@ -848,7 +855,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
 
   log(`we are getting package rating for package id ${packageId}`)
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
@@ -892,6 +899,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
       return
 
     }
+    console.log(" you are admin you can access the rating")
 
     const metrics=await getPackageRatingQuery(packageId)  
 
@@ -904,22 +912,22 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
     
     const packageRating = {
-      RampUp: metrics.rows[0].ramp_up,
-      Correctness: metrics.rows[0].correctness,
       BusFactor: metrics.rows[0].bus_factor,
-      ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
-      LicenseScore: metrics.rows[0].license_score,
-      GoodPinningPractice: metrics.rows[0].good_pinning_practice,
-      PullRequest: metrics.rows[0].pull_request,
-      NetScore: metrics.rows[0].net_score,
-      RampUpLatency: metrics.rows[0].ramp_up_latency,
-      CorrectnessLatency: metrics.rows[0].correctness_latency,
       BusFactorLatency: metrics.rows[0].bus_factor_latency,
+      Correctness: metrics.rows[0].correctness,
+      CorrectnessLatency: metrics.rows[0].correctness_latency,
+      RampUp: metrics.rows[0].ramp_up,
+      RampUpLatency: metrics.rows[0].ramp_up_latency,
+      ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
       ResponsiveMaintainerLatency:metrics.rows[0].responsive_maintainer_latency,
+      LicenseScore: metrics.rows[0].license_score,
       LicenseScoreLatency: metrics.rows[0].license_score_latency,
+      GoodPinningPractice: metrics.rows[0].good_pinning_practice,
       GoodPinningPracticeLatency: metrics.rows[0].good_pinning_practice_latency,
+      PullRequest: metrics.rows[0].pull_request,
       PullRequestLatency: metrics.rows[0].pull_request_latency,
-      NetScoreLatency: metrics.rows[0].net_score_latency,
+      NetScore: metrics.rows[0].net_score,
+      NetScoreLatency: metrics.rows[0].net_score_latency
     };
   
     if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
@@ -969,7 +977,7 @@ export const updatePackage = async (req: Request, res: Response) => {
   try{
     log(`package id is ${packageId}`)
     //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers['x-authorization'] as string; 
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
@@ -1228,7 +1236,7 @@ export const packageCost = async (req: Request, res: Response)=> {
   const client = await pool.connect();
   const key = `packages/${id}.zip`;
   console.log(`PackageCost called with id ${id}`);
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization'] as string;
 
 
   const token = authHeader && authHeader.split(' ')[1];

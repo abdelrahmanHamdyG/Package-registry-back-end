@@ -16,7 +16,8 @@ import { insertPackageDependency } from '../queries/packages_queries.js';
 
 
 export const checkIfIamAdmin = async (req: Request)=>{
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers['x-authorization'] as string;
+  
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
@@ -390,10 +391,11 @@ export const getPackagesFromPackageJson=(dir: string): string[]=> {
         // Extract dependencies and devDependencies if they exist
         if (packageJson.dependencies) {
             packagesList.push(...Object.keys(packageJson.dependencies));
-        }
-        if (packageJson.devDependencies) {
-            packagesList.push(...Object.keys(packageJson.devDependencies));
-        }
+        }else{
+          if (packageJson.devDependencies) {
+              packagesList.push(...Object.keys(packageJson.devDependencies));
+          }
+      }
     } else {
         console.error(`No 'package.json' found at path: ${packageJsonPath}`);
     }
