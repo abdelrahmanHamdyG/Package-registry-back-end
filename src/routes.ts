@@ -12,6 +12,7 @@ router.get("", (req: Request, res: Response) => {
   res.send("You are not at a valid endpoint. Try using '/package' or other routes.");
 });
 
+router.get("/package/:id/cost",packageCost)
 
 router.get("/package/:id/rate", getPackageRating);
 router.post("/Access/:user_id",updateUserAccess)
@@ -52,7 +53,6 @@ router.get("/groups/:groupid",getUsersByGroup)
 router.post("/logout/",logout)
 
 router.post("/history",getPackageHistory)
-router.get("/package/:id/cost",packageCost)
 // POST /package/byRegEx - Search packages by regular expression
 
 export default router;  // Export router for use in the app

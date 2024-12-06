@@ -19,6 +19,7 @@ export const checkIfIamAdmin = async (req: Request)=>{
   const authHeader = req.headers['x-authorization'] as string;
   
   const token = authHeader && authHeader.split(' ')[1];
+  log(`token is ${token}`)
 
   if (!token) {
     return -1; // Token is missing
@@ -446,6 +447,7 @@ const getPackageJson=(dir: string): string | null=> {
       const fullPath = path.join(dir, file);
 
       
+
       
       // If it's a directory, recursively search inside it
     

@@ -139,15 +139,16 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
     // Execute the combined query
     const result = await pool.query(queryText, queryParams);
+    console.log("results in searchPackegs by queries are ",result.rows)
     const packages = result.rows.map(pkg => ({
       Version: pkg.version,
       Name: pkg.name,
       ID: pkg.id.toString(), // Ensure ID is a string
     }));
-        
+    console.log("Packages is like  ",packages)
     // Return response with packages and offset in headers
     res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
-    res.status(200).json({ packages });
+    res.status(200).json( packages );
   } catch (error) {
     console.log(`Error executing query: ${error}`);
     res.status(500).json({ error: 'Internal server error' });
@@ -685,12 +686,12 @@ try {
       const packVersion:string=packageMetaData.rows[i].version;
       
         metadataList.push({
-          metadata:{
+          
             Version:packVersion,
             Name:packName,
 
             ID:packId
-          }
+          
         });
     }
     res.status(200).json(metadataList)
@@ -714,11 +715,11 @@ try {
       const packVersion:string=packageMetaData.rows[i].version;
       
         metadataList.push({
-          metadata:{
+          
             Version:packVersion,
             Name:packName,
             ID:packId
-          }
+          
         });
     }
 
@@ -912,22 +913,22 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
     
     const packageRating = {
-      BusFactor: metrics.rows[0].bus_factor,
-      BusFactorLatency: metrics.rows[0].bus_factor_latency,
-      Correctness: metrics.rows[0].correctness,
-      CorrectnessLatency: metrics.rows[0].correctness_latency,
-      RampUp: metrics.rows[0].ramp_up,
-      RampUpLatency: metrics.rows[0].ramp_up_latency,
-      ResponsiveMaintainer:metrics.rows[0].responsive_maintainer,
-      ResponsiveMaintainerLatency:metrics.rows[0].responsive_maintainer_latency,
-      LicenseScore: metrics.rows[0].license_score,
-      LicenseScoreLatency: metrics.rows[0].license_score_latency,
-      GoodPinningPractice: metrics.rows[0].good_pinning_practice,
-      GoodPinningPracticeLatency: metrics.rows[0].good_pinning_practice_latency,
-      PullRequest: metrics.rows[0].pull_request,
-      PullRequestLatency: metrics.rows[0].pull_request_latency,
-      NetScore: metrics.rows[0].net_score,
-      NetScoreLatency: metrics.rows[0].net_score_latency
+      BusFactor: Number(metrics.rows[0].bus_factor),
+      BusFactorLatency: Number(metrics.rows[0].bus_factor_latency),
+      Correctness: Number(metrics.rows[0].correctness),
+      CorrectnessLatency: Number(metrics.rows[0].correctness_latency),
+      RampUp: Number(metrics.rows[0].ramp_up),
+      RampUpLatency: Number(metrics.rows[0].ramp_up_latency),
+      ResponsiveMaintainer:Number(metrics.rows[0].responsive_maintainer),
+      ResponsiveMaintainerLatency:Number(metrics.rows[0].responsive_maintainer_latency),
+      LicenseScore: Number(metrics.rows[0].license_score),
+      LicenseScoreLatency: Number(metrics.rows[0].license_score_latency),
+      GoodPinningPractice: Number(metrics.rows[0].good_pinning_practice),
+      GoodPinningPracticeLatency:Number( metrics.rows[0].good_pinning_practice_latency),
+      PullRequest:Number( metrics.rows[0].pull_request),
+      PullRequestLatency: Number(metrics.rows[0].pull_request_latency),
+      NetScore: Number(metrics.rows[0].net_score),
+      NetScoreLatency: Number(metrics.rows[0].net_score_latency)
     };
   
     if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
