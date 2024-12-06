@@ -1371,6 +1371,9 @@ export const packageCost = async (req: Request, res: Response)=> {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken' });
       return;
     }
+    else if (!id){
+      res.status(404).json({ error: 'Package does not exist.' });
+    }
     else {
       res.status(500).json({ error: 'The package rating system choked on at least one of the metrics.' });
     }
