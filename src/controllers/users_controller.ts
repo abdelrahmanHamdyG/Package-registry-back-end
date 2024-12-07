@@ -113,7 +113,7 @@ export const authenticate = async (req: Request, res: Response) => {
       const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        console.log(`password is ${Secret.password}`)
+        log(`password is ${Secret.password}`)
         log(`password for userName ${User.name} is incorret`)
         return;
       }

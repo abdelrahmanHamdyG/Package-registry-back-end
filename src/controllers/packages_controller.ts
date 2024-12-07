@@ -17,16 +17,14 @@ import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery
 import {log} from '../phase_1/logging.js'
 
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
-import { Client } from 'pg';
-import { loadEnvFile } from 'process';
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
   const queries: Array<{ Name: string; Version?: string }> = req.body;
   const offset: number = parseInt(req.query.offset as string) || 0;
   const packages: any[] = [];
   
-  console.log('Request body is', req.body);
-  console.log(`Request body is ${JSON.stringify(req.body)}`);
+  log('Request body for search packages queries', req.body);
+  
 
   if (
     !Array.isArray(queries) ||
@@ -37,11 +35,12 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
         (query.Version !== undefined && typeof query.Version !== 'string')
     )
   ) {
+
     res.status(400).json({
       error:
         'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
     });
-    console.log('Invalid or missing fields in PackageQuery');
+    log('Invalid or missing fields in PackageQuery');
     return;
   }
 
@@ -51,7 +50,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    console.log(`Token is missing`);
+    log(`Token is missing in searchPackage by queries`);
     return;
   }
 
@@ -68,11 +67,13 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 
     if (canISearchFlag.rows.length === 0 && isAdmin !== 1) {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+      log("token is missing in search packages by queries")
       return;
     }
 
     if (!canISearchFlag.rows[0].can_search && isAdmin !== 1) {
       res.status(405).json({ error: 'User not allowed to search' });
+      log("user is not allowed to search packages by queries")
       return;
     }
 
@@ -135,23 +136,23 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     queryText += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
 
-    console.log(`The query is: ${queryText}`);
-    console.log(`Query parameters: ${queryParams}`);
+    log(`The query is: ${queryText}`);
+    log(`Query parameters: ${queryParams}`);
 
     // Execute the combined query
     const result = await pool.query(queryText, queryParams);
-    console.log("results in searchPackegs by queries are ",result.rows)
+    log("results in searchPackegs by queries are " +result.rows)
     const packages = result.rows.map(pkg => ({
       Version: pkg.version,
       Name: pkg.name,
       ID: pkg.id.toString(), // Ensure ID is a string
     }));
-    console.log("Packages is like  ",packages)
+    
     // Return response with packages and offset in headers
     res.setHeader('offset', offset + limit); // Set the offset for the next page in response header
     res.status(200).json( packages );
   } catch (error) {
-    console.log(`Error executing query: ${error}`);
+    log(`Error executing search packages by queries : ${error}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -165,13 +166,13 @@ export const resetRegistry = async (req: Request, res: Response) => {
     
     if(isAdmin==-1){
       res.status(403).json({ error: "Authentication failed due to invalid or missing AuthenticationToken."});
-      log("not an admin");
+      log("token is missing in  reset");
       return;
       
     }
     if (isAdmin==0) {
       res.status(401).json({ error: "You do not have permission to reset the registry."});
-      log("not an admin");
+      log("you are not allowed to reset as you are not admin");
       return;
     }
 
@@ -179,6 +180,8 @@ export const resetRegistry = async (req: Request, res: Response) => {
     try {
       await resetRegistryQuery();
       res.status(200).json({error:'Registry is reset'});
+      log("Registry is reset successfully")
+      return 
     }
     catch (error) {
       log(`eror in reseting the registry:${error}`, );
@@ -189,12 +192,14 @@ export const resetRegistry = async (req: Request, res: Response) => {
   
   
 export const uploadPackage = async (req: Request, res: Response) => {
+
   let { Name,Content, JSProgram, debloat, URL } = req.body;
   let key = '';
   let id = 0;
+
   if ((!Content && !URL) || (Content && URL)) {
     res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-    log("Error: Invalid format of Content and URL");
+    log("Error: Invalid format of Content and URL during uploadPackage");
     return;
   }
   const authHeader = req.headers['x-authorization'] as string;
@@ -202,7 +207,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    log(`Unauthorized: Token missing.`)
+    log(`Unauthorized: Token missing. during uploading package`)
     return
   }
   const client = await pool.connect();
@@ -215,26 +220,25 @@ export const uploadPackage = async (req: Request, res: Response) => {
     
     if(!canIUploadFlag.rows[0].can_upload){
       res.status(400).json({"error":"sorry you don't have access to upload  "})
-      log(`sorry you don't have access to upload`)
+      log(`sorry you don't have access to upload package `)
       return
     }
 
-    // we are inserting to the package with group_id=NULL
-    
-    
+
     if (Content) {
 
       if (Name){
         const packageMetaData = await insertPackageQuery(client, Name, "1.0.0");
         id = packageMetaData.rows[0].id;
         key = `packages/${id}.zip`; 
-        log(`package ${Name} is with id:${id}`)
+        log(`uploading package ${Name} is with id:${id}`)
       }
       else{
         console.error("name is undefined")
         res.status(440).json({ error: 'Name is undefined' });
         return
       }
+
       log(`${Name} is uploaded by Content `)
       // it is uploaded by content
       // reading the buffer writing it to the device 
@@ -284,13 +288,13 @@ export const uploadPackage = async (req: Request, res: Response) => {
       // the package is uploaded with URL 
 
       const metrics=await processUrl(URL)
-      console.log(`Metics Calculated for ${URL}: `)
+      log(`Metics Calculated for ${URL}: `)
       if ((metrics?.NetScore||0)<0.5){
         res.status(424).json({"error":"disqualified package"})
         log(`Package ${Name} is disqualified`)
         return 
       }
-      console.log(`Package ${Name} is qualified`)
+      log(`Package ${Name} is qualified`)
       
       const tempDir = path.join(os.tmpdir(), `repo`);
       fs.mkdirSync(tempDir, { recursive: true });
@@ -301,10 +305,10 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
       if (isnpm) {
         
-        console.log(`${URL} is an NPM package.`);
+        log(`${URL} is an NPM package.`);
         const package_name = get_npm_package_name(URL);
         const repoURL = await get_repo_url(package_name);
-        console.log(`The GitHub repo of the package is ${repoURL}`);
+        log(`The GitHub repo of the package is ${repoURL}`);
 
         // Clone the repository
         await git.clone({
@@ -315,12 +319,11 @@ export const uploadPackage = async (req: Request, res: Response) => {
           singleBranch: true,
           depth: 1,
         });
-        console.log(`Cloned ${repoURL} successfully.`);
+        log(`Cloned ${repoURL} successfully.`);
 
         // Get package information
 
-        console.log("we are starting to get the name from package json")
-        console.log("we are starting to get the name from package json")
+        log("we are starting to get the name from package json")
         const packageNameFromPackageJson  = await getNameFromPackageJson(tempDir);
         if (packageNameFromPackageJson =="no name"){
           Name=package_name
@@ -329,8 +332,9 @@ export const uploadPackage = async (req: Request, res: Response) => {
           Name = packageNameFromPackageJson
         }
 
-        console.log("we get the name from package json successfully")
         log("we get the name from package json successfully")
+
+
         const packageMetaData = await insertPackageQuery(client, Name, '1.0.0');
         id = packageMetaData.rows[0].id;
         key = `packages/${id}.zip`;
@@ -338,7 +342,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         URL = repoURL; // Update URL to GitHub repo URL
       } else {
         // GitHub URL provided directly
-        console.log(`We are cloning the package ${URL}`);
+        log(`We are cloning the package ${URL}`);
 
         // Clone the repository
         await git.clone({
@@ -349,10 +353,10 @@ export const uploadPackage = async (req: Request, res: Response) => {
           singleBranch: true,
           depth: 1,
         });
-        console.log(`Cloned ${URL} successfully.`);
+        log(`Cloned ${URL} successfully.`);
 
 
-        console.log("we are getting the name of package json")
+        log("we are getting the name of package json")
         // Get package information
         const packageName = await getNameFromPackageJson(tempDir);
         if (packageName=="no name"){
@@ -366,7 +370,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         key = `packages/${id}.zip`;
       }
 
-      console.log("we got  the name of package json")
+      log("we got  the name of package json")
       
       
       await insertPackageRatingQuery(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
@@ -375,7 +379,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
         ?.License_Latency,metrics?.DependencyLatency,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
       );
-      console.log(`we insert the rating of Package ${Name}`)
+      log(`we insert the rating of Package ${Name}`)
 
       if(debloat){
         await debloat_file(tempDir)
@@ -383,31 +387,31 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
       const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       await zipDirectory(tempDir, zipPath);
-      console.log(`Zipped repository to ${zipPath}`);
+      log(`Zipped repository to ${zipPath}`);
       const fileStream = fs.createReadStream(zipPath);
 
-      console.log(`we  starting uploaded ${URL} to S3 `)
+      log(`we  starting uploaded ${URL} to S3 `)
       await uploadZipToS3(key,fileStream,'application/zip')
-      console.log(`we uploaded ${URL} to S3 Successfully `)
+      log(`we uploaded ${URL} to S3 Successfully `)
 
 
       const base64Content=await encodeFileToBase64(zipPath)
       
 
 
-      console.log("we get the zipped file succssfully")
+      log("we get the zipped file succssfully")
       await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
-      console.log(`we inserted ${URL} to PackageData Successfully `)
+      log(`we inserted ${URL} to PackageData Successfully `)
 
 
 
       
-      console.log(`we statrted inserting ${Name} to history`)
+      log(`we statrted inserting ${Name} to history`)
       await insertToPackageHistoryQuery(userId,"CREATE",id,client)
-      console.log(`we statrted inserting ${Name} to history successfully`)
+      log(`we inserted ${Name} to history successfully`)
       await client.query('COMMIT');
 
-      console.log(`we statrted removing the directories we used`)
+      log(`we started removing the directories we used`)
       
       try {
         if (await fss.stat(tempDir).catch(() => false)) {
@@ -421,7 +425,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         console.error('Error during cleanup:', error);
       }      
 
-      console.log(`we removed the directories we used succesfully`)
+      log(`we removed the directories we used succesfully`)
 
       res.status(201).json({
         // 
@@ -436,7 +440,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         }
       });
 
-      console.log("ahmed sayed")
+      log("res.status is called in uploading package ")
     }
   } catch (error) {
     
@@ -462,32 +466,33 @@ export const uploadPackage = async (req: Request, res: Response) => {
 };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
-  log("here")
+  log("we are getting package by id ")
   const idRead =req.params.id
 
   const regex = /^[a-zA-Z0-9\-]+$/;
   if(!idRead || !regex.test(idRead)){
 
     res.status(400).json({"error":"There is missing field(s) in the PackageID or it is formed improperly, or is invalid."})
+    log("gettingPackageById: missing field");
     return
   }
 
   const id=Number(idRead)
-
+  log("gettingPackageById:the number is ", id)
   if(isNaN(id)){
     res.status(404).json({"error":"Package does not exist."})
+    log("gettingPackageById:package doesn't exists")
     return
   }
-  log(`getPackageByID called with ${id}`);
+
+  
 
   const authHeader = req.headers['x-authorization'] as string;
-  log(`auth header is ${authHeader}`)
   const token = authHeader && authHeader.split(' ')[1];
-  log(`token  is ${authHeader}`)
-
+  
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    log(`Unauthorized: Token missing.`)
+    log(`GettingPacakgeByID: Unauthorized: Token missing.`)
     return
   }
 
@@ -500,6 +505,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     if(isAdmin==-1){
 
       res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
+      log("token missing Getting Package By ID")
       return
 
     }
@@ -519,9 +525,8 @@ export const getPackageByID = async (req: Request, res: Response)=> {
     
     if(result.rows.length==0&&isAdmin!=1){
 
-      log(`no thing returned from the table for user ${userId}`)
+      log(`can't access user for getting package by ID `)
       res.status(500).json({"error":"Internal Server erorr"})
-      
       return
     }
     
@@ -539,7 +544,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
     const package_data = await getPackageByIDQuery(client, id);
 
-    log("we got the package by ID ")
+    
     if (package_data.rows.length === 0) {
       log(`Package with id:${id} doesn't exist`);
       await client.query("ROLLBACK");
@@ -547,10 +552,12 @@ export const getPackageByID = async (req: Request, res: Response)=> {
       return;
     }
 
-    log(package_data.rows[0])
+    
     
     if(package_data.rows[0].group_id ){
-      log("we are here1 ")
+
+      log("we managed to get the package ")
+
       const userGroupResults=await getUserGroupQuery(userId)
       
 
@@ -631,7 +638,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 export const searchPackageByRegex = async (req: Request, res: Response) => {
 const { RegEx } = req.body;
 
-log(`Searching package by Regext with ${RegEx} called`)
+log(`Searching package by Regex with ${RegEx} called`)
 
 
 if (!RegEx) {
@@ -648,7 +655,7 @@ const token = authHeader && authHeader.split(' ')[1];
 
 if (!token) {
   res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-  log(`Unauthorized: Token missing.`)
+  log(`Unauthorized: Token missing. during searching Packages `)
   return
 }
 
@@ -657,11 +664,10 @@ try {
   const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
   const userId = decoded.sub;
   const isAdmin=await checkIfIamAdmin(req)
-  log(`isAdmin: ${isAdmin}`)
+  
   if(isAdmin!=1){
     const canISearchFlag=await canISearchQuery(userId)
-    
-
+  
     if (!canISearchFlag.rows[0].can_search){
       
       res.status(405).json({"error":"sorry you don't have access to search with this regex "})
@@ -695,7 +701,9 @@ try {
           
         });
     }
+    log("I am returning packages data got by searchPackageByRegex  successfully" + JSON.stringify(metadataList))
     res.status(200).json(metadataList)
+    
   }else{
 
     // he is an admin
@@ -724,7 +732,8 @@ try {
         });
     }
 
-    
+    log("I am returning packages data got by searchPackageByRegex  successfully" + JSON.stringify(metadataList))
+
     res.status(200).json(metadataList)
 
 
@@ -839,8 +848,10 @@ export const getPackageRating=async (req:Request,res:Response)=>{
   const packageIdRead = req.params.id 
   const regex = /^[a-zA-Z0-9\-]+$/;
 
+  
   if(!packageIdRead || !regex.test(packageIdRead)){
 
+    log("rating:we can't read the package or the id is not valid for the regex" )
     res.status(400).json({"error":"There is missing field(s) in the PackageID"})
     return
   }
@@ -848,9 +859,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
 
   const packageId=Number(packageIdRead)
+  log("rarting:package rating is called with id ", packageId)
 
 
   if(isNaN(packageId)){
+    log("rating: package doesn't exists")
     res.status(404).json({"error":"Package does not exist."})
     return
   }
@@ -862,7 +875,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    log(`Unauthorized: Token missing.`)
+    log(`rating: Unauthorized: Token missing.`)
     return
   }
 
@@ -880,7 +893,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(result.rows.length==0&&isAdmin!=1){
 
       res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
-      log(`no thing returned from the table for user ${userId}`)
+      log(`rating:no thing returned from the table for user ${userId}`)
       return
     }
 
@@ -888,27 +901,28 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(!canISearchBool && isAdmin!=1){
 
       res.status(402).json({"error":"sorry you are not allowed to get the rating "})
-      log(`sorry you  ${userId} are not allowed to get the rating `)
+      log(`rating:sorry you  ${userId} are not allowed to get the rating `)
       return
     }
 
 
+    log("rating: we are calling can userAccessPackageQuery")
     const same_group_id=await canUserAccessPackageQuery(userId,packageId)
 
     if(!same_group_id && isAdmin!=1){
       res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
-      log(`sorry you are not allowed to get the rating of this package${userId}`)
+      log(`rating:sorry you are not allowed to get the rating of this package${userId}`)
       return
 
     }
-    console.log(" you are admin you can access the rating")
+    log("rating: you are admin you can access the rating")
 
     const metrics=await getPackageRatingQuery(packageId)  
 
     if (metrics.rows.length==0){
 
       res.status(404).json({error:"Package doesn't exists"})
-      log(`package doesn't exist with id ${packageId}`)
+      log(`rating:packageRating: package doesn't exist with id ${packageId}`)
       return
     }
 
@@ -931,11 +945,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
       NetScore: Number(metrics.rows[0].net_score),
       NetScoreLatency: Number(metrics.rows[0].net_score_latency)
     };
-  
+    log("rating: package rating for package with id "+ packageId +" is: "+ JSON.stringify(packageRating))
     if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
       ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice==-1
     ){
-      log("chocked on at least one of the metrics")
+      log("rating:chocked on at least one of the metrics")
       res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
       return
     }
@@ -947,11 +961,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     } catch (error) {
 
       if (error instanceof Error&& error.message === 'TokenExpiredError') {
-        log(`Token expired:${error}` );
+        log(`rating: Token expired:${error}` );
         res.status(403).json({ error: 'Token has expired.' });
         return;
       }
-      log(`Error fetching package rating:${error}`, );
+      log(`rating:Error fetching package rating:${error}`, );
       if (error instanceof Error) {
           res.status(500).json({ message: `Internal server error: ${error.message}` });
       }
@@ -1007,7 +1021,7 @@ export const updatePackage = async (req: Request, res: Response) => {
     }
     const canAccess=await canUserAccessPackageQuery(userId,packageId)
     if(!canAccess && ! isAdmin){
-      console.log("access problem")
+      log("access problem")
       res.status(405).json({error:"you are now allowd to update this package"})
       log("Update:can update packages but this package outside his group ")
       return 
@@ -1032,7 +1046,7 @@ export const updatePackage = async (req: Request, res: Response) => {
       res.status(400).json({error:"you can't change the way you upload the package with it has to be using URL"});
       return;
     }
-    console.log(`Update:latest verion is ${latestVersionBeforeSplit}`)
+    log(`Update:latest verion is ${latestVersionBeforeSplit}`)
     const update_version = Version.split('.').map(Number);
     const latestVersion = latestVersionBeforeSplit.split('.').map(Number);
     let result=1;
@@ -1068,10 +1082,10 @@ export const updatePackage = async (req: Request, res: Response) => {
         const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
-        console.log("Update:Unzipped content to temporary directory.");
+        log("Update:Unzipped content to temporary directory.");
         if (debloat) {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
-          console.log("Update:Debloated package contents.");
+          log("Update:Debloated package contents.");
         }
         const debloat_package_zipped_path=path.join(os.tmpdir(), `debloated-package-${id}.zip`);
         await zipDirectory(path_after_unzipping,debloat_package_zipped_path)
@@ -1091,7 +1105,7 @@ export const updatePackage = async (req: Request, res: Response) => {
             JSProgram:JSProgram
           }
         });
-        console.log(`Update:Package ${Name} version ${Version} uploaded successfully`);
+        log(`Update:Package ${Name} version ${Version} uploaded successfully`);
         if (fs.existsSync(path_after_unzipping)) {
           fs.rmSync(path_after_unzipping, { recursive: true, force: true });
         }
@@ -1160,7 +1174,7 @@ export const updatePackage = async (req: Request, res: Response) => {
             singleBranch: true,
             depth: 1,
           });
-          console.log(`Update:Cloned ${URL} successfully.`);
+          log(`Update:Cloned ${URL} successfully.`);
 
           // Get package information
           const packageName =  getNameFromPackageJson(tempDir);
@@ -1192,7 +1206,7 @@ export const updatePackage = async (req: Request, res: Response) => {
         }
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         await zipDirectory(tempDir, zipPath);
-        console.log(`Update:Zipped repository to ${zipPath}`);
+        log(`Update:Zipped repository to ${zipPath}`);
         const fileStream = fs.createReadStream(zipPath);
         uploadZipToS3(key,fileStream,'application/zip')
         const zipFileContent = fs.readFileSync(zipPath);
@@ -1247,7 +1261,7 @@ export const packageCost = async (req: Request, res: Response)=> {
   const id =Number(req.params.id)
   const client = await pool.connect();
   const key = `packages/${id}.zip`;
-  console.log(`PackageCost called with id ${id}`);
+  log(`PackageCost called with id ${id}`);
   const authHeader = req.headers['x-authorization'] as string;
 
 
@@ -1261,7 +1275,7 @@ export const packageCost = async (req: Request, res: Response)=> {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
     const isAdmin=await checkIfIamAdmin(req)
-    console.log(`my user Id is ${userId}`)
+    log(`my user Id is ${userId}`)
     // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
     const result=await canISearchQuery(userId)    
     if(result.rows.length==0&&isAdmin!=1){
@@ -1270,18 +1284,18 @@ export const packageCost = async (req: Request, res: Response)=> {
       return
     }
     const canIReadBool=result.rows[0]
-    console.log(canIReadBool)
+    log(canIReadBool)
     if(!canIReadBool.can_search&&isAdmin!=1){
       res.status(400).json({"error":"sorry you don't have access to download this package "})
       console.error(`sorry you don't have access to download this package as ${userId}`)
       return
     }
-    console.log(`User ${userId} can download packages `)
+    log(`User ${userId} can download packages `)
 
     await client.query("BEGIN");
 
     let package_data = await getPackageDependeciesByIDQuery(client,id);
-    console.log(package_data.rows.length)
+    
 
     if(!package_data.rows.length){
       const zipFileContent = await downloadFromS3(key);
@@ -1293,20 +1307,17 @@ export const packageCost = async (req: Request, res: Response)=> {
         // If Base64 string, decode it
         content_as_base64 = Buffer.from(zipFileContent, 'base64');
       } else {
-        console.log("da5al 2 ")
+        log("da5al 2 ")
         throw new Error('Unsupported type for zipFileContent');
         
       }
       const resultsForName= await getPackageNameByIDQuery(client, id)
-      console.log(resultsForName)
-      console.log(resultsForName.rows[0])
-      console.log(resultsForName.rows[0].name)
-
+    
       
       if (!resultsForName.rows.length){
-        console.log("we are returning 404 because the package doens't exist")
+        log("we are returning 404 because the package doens't exist")
         res.status(404).json({ error: 'Package does not exist' });
-        console.log("da5al 3 ")
+        log("da5al 3 ")
         return
       }
 
@@ -1320,7 +1331,7 @@ export const packageCost = async (req: Request, res: Response)=> {
       const stats=await fs.promises.stat(path_after_unzipping)
       adj_list.set(Name, { strings: new Set(), num: stats.size });
       const packageData = adj_list.get(Name);
-      console.log("da5al 4 ")
+      log("da5al 4 ")
       if (packageData) {
         for (const pack of packagesList) {
             packageData.strings.add(pack);
@@ -1335,7 +1346,7 @@ export const packageCost = async (req: Request, res: Response)=> {
         res.status(404).json({ error: "Package doesn't exist" });
         return;
       }
-      console.log("da5al 5 ")
+      log("da5al 5 ")
     }
 
 
@@ -1353,7 +1364,7 @@ export const packageCost = async (req: Request, res: Response)=> {
         console.error(`sorry you don't have access to get this package cost as ${userId}`)
         return 
       }
-      console.log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
+      log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
       if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&isAdmin!=1 ){
         res.status(600).json({"error":"sorry you don't have access to get this package cost "})
         console.error(`sorry you don't have access to get this package cost as ${userId}`)
@@ -1361,7 +1372,7 @@ export const packageCost = async (req: Request, res: Response)=> {
       }
 
     }
-    console.log(`we found the package with id:${id}`)
+    log(`we found the package with id:${id}`)
     
 
     await client.query("COMMIT");

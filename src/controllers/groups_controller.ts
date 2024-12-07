@@ -5,6 +5,7 @@ import { assignPackageGroupQuery, checkGroupExistsQuery, doesGroupExistQuery, ge
 import { doesUserExistQuery } from '../queries/users_queries.js';
 import { checkPackageExistsQuery } from '../queries/packages_queries.js';
 import {log} from '../phase_1/logging.js'
+
 export const createGroup=async(req:Request,res:Response)=>{
 
     const {name}=req.body;

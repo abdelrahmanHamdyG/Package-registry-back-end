@@ -2,7 +2,7 @@
 import { PoolClient } from 'pg';
 import pool from '../db.js'; // Adjust the path according to your project structure
 import { bool } from 'aws-sdk/clients/signer.js';
-
+import {log} from '../phase_1/logging.js'
 
 
 export const canIReadQuery=async (user_id:number)=>{
@@ -121,6 +121,7 @@ export const canUserAccessPackageQuery  = async (userId: number, packageId: numb
       return false; // Package not found or user doesn't have access
     } catch (error) {
       console.error(`Error checking access for user ${userId} to package ${packageId}:`, error);
+      log(`Error checking access for user ${userId} to package ${packageId}: ${error}`)
       return false
     }
   };

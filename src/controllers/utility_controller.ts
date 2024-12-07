@@ -9,7 +9,6 @@ import jwt from 'jsonwebtoken';
 import path, { parse } from "path"
 import archiver from "archiver";
 import pool from '../db.js'; 
-import { Bool } from 'aws-sdk/clients/clouddirectory.js';
 import {log} from '../phase_1/logging.js'
 import { PoolClient } from 'pg';
 import { insertPackageDependency } from '../queries/packages_queries.js';
@@ -19,7 +18,6 @@ export const checkIfIamAdmin = async (req: Request)=>{
   const authHeader = req.headers['x-authorization'] as string;
   
   const token = authHeader && authHeader.split(' ')[1];
-  log(`token is ${token}`)
 
   if (!token) {
     return -1; // Token is missing
@@ -107,7 +105,7 @@ export const get_npm_adjacency_list = async (
 ) => {
   const normalizedPackageName = packageName.toLowerCase(); // Normalize package name
   const url = `https://registry.npmjs.org/${normalizedPackageName}`;
-  console.log(url);
+  log(url);
 
   try {
     const response = await fetch(url);
@@ -237,7 +235,7 @@ export const printingTheCost = async (
 
     try {
       await insertPackageDependency(client, package_id, pack, standaloneCost, totalCost);
-      console.log(`${pack} - Standalone Cost: ${standaloneCost}, Total Cost: ${totalCost}`);
+      log(`${pack} - Standalone Cost: ${standaloneCost}, Total Cost: ${totalCost}`);
     } catch (error) {
       console.error(`Error inserting dependency for ${pack}:, error`);
     }
@@ -269,7 +267,7 @@ export const getGitHubRepoNameFromUrl = (url: string): string | null => {
   const regex = /github\.com[\/:](.+?)\/([^\/]+)/;
   
   const match = url.match(regex);
-  console.log("we are heerrrr")
+  log("we are heerrrr")
   if (match) {
       return match[2]; // Return the repository name (second capture group)
   }
