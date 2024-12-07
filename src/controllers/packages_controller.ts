@@ -18,6 +18,7 @@ import {log} from '../phase_1/logging.js'
 
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 import { Client } from 'pg';
+import { loadEnvFile } from 'process';
 
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
   const queries: Array<{ Name: string; Version?: string }> = req.body;
@@ -970,26 +971,25 @@ export const updatePackage = async (req: Request, res: Response) => {
   const { metadata, data } = req.body;
   let {Name, Version } = metadata || {};
   let { Content, URL, debloat, JSProgram } = data || {};
-  const client = await pool.connect();
-  let id=0
-  let key=''
   let equalNames=true
+  let key = '';
+  let id = 0;
+  const client = await pool.connect();
 
   try{
-    log(`package id is ${packageId}`)
     //const returnedName=(await (getNameVersionById(client,packageId))).rows[0].name
     const authHeader = req.headers['x-authorization'] as string; 
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-      log(`Unauthorized: Token missing.`)
+      log(`Update: Unauthorized: Token missing.`)
       return
     }
     
     const isAdmin=await checkIfIamAdmin(req)
     if(isAdmin==-1){
       res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
-      log("can I uploadFlag return null")
+      log("Update:can I uploadFlag return null")
       return
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
@@ -997,24 +997,25 @@ export const updatePackage = async (req: Request, res: Response) => {
     const canIUploadFlag=await canIUploadQuery(userId)
     if(canIUploadFlag.rows.length==0){
       res.status(403).json({error:"Authentication failed due to invalid or missing AuthenticationToken."})
-      log("can I uploadFlag return null")
+      log("Update:can I uploadFlag return null")
       return
     }    
     if(!canIUploadFlag.rows[0].can_upload){
         res.status(405).json({error:"you are not allowed update packages"})
-        log("not admin and can I upload flag =0")
+        log("Update:not admin and can I upload flag =0")
         return
     }
     const canAccess=await canUserAccessPackageQuery(userId,packageId)
-    if(!canAccess){
+    if(!canAccess && ! isAdmin){
       console.log("access problem")
       res.status(405).json({error:"you are now allowd to update this package"})
-      log("can update packages but this package outside his group ")
+      log("Update:can update packages but this package outside his group ")
       return 
     }
     const returnedNameWithoutRows=(await (getNameVersionByIdQuery(client,packageId)))
     if(returnedNameWithoutRows.rows.length==0){
       res.status(400).json({error:"package doesn't exist" });
+      log("Update:package does not exist ")
       return;
     }
     const returnedName=returnedNameWithoutRows.rows[0].name
@@ -1023,13 +1024,15 @@ export const updatePackage = async (req: Request, res: Response) => {
     const latestPackageUrl=latestPackage.url
     if(!latestPackageUrl&&URL){
       res.status(400).json({error:"you can't change the way you upload the package with it has to be using content"});
+      log("Update:changing the way of upload")
       return;
     }
     if(latestPackageUrl&&!URL){
+      log("Update:changing the way of upload")
       res.status(400).json({error:"you can't change the way you upload the package with it has to be using URL"});
       return;
     }
-    console.log(`latest verion is ${latestVersionBeforeSplit}`)
+    console.log(`Update:latest verion is ${latestVersionBeforeSplit}`)
     const update_version = Version.split('.').map(Number);
     const latestVersion = latestVersionBeforeSplit.split('.').map(Number);
     let result=1;
@@ -1038,35 +1041,37 @@ export const updatePackage = async (req: Request, res: Response) => {
         result = -1;
       }
     if ((!Content && !URL) || (Content && URL) ||!Version ) {
-      console.log(`Name is ${Name} returned name is ${returnedName}`)
+      log(`Update:Name is ${Name} returned name is ${returnedName}`)
       res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
       console.error("Error: Invalid format of Content and URL");
       return;
     }
     if(result==-1){
       res.status(300).json({error:'the updated is outdated so no thing to do'});
+      log("update: result=-1")
       return;
     }
       await client.query('BEGIN');
       if (Content) {
         if (Name!=returnedName){
           res.status(400).json({ error: "The new name and the old name aren't the same" });
+          log("update:the name is different in content")
           return
         }
         const packageMetaData = await insertPackageQuery(client, Name, Version);
         id= packageMetaData.rows[0].id;
         key = `packages/${id}.zip;` // Example key path
-        console.log(`id is ${id}`);
+        log(`update:id is ${id}`);
         const content_as_base64=Buffer.from(Content,"base64")
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         fs.writeFileSync(zipPath, content_as_base64);
         const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
-        console.log("Unzipped content to temporary directory.");
+        console.log("Update:Unzipped content to temporary directory.");
         if (debloat) {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
-          console.log("Debloated package contents.");
+          console.log("Update:Debloated package contents.");
         }
         const debloat_package_zipped_path=path.join(os.tmpdir(), `debloated-package-${id}.zip`);
         await zipDirectory(path_after_unzipping,debloat_package_zipped_path)
@@ -1075,7 +1080,7 @@ export const updatePackage = async (req: Request, res: Response) => {
         await uploadBase64ToS3(base64FinalContent,  key);    
         await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
         await insertPackageRatingQuery(client,id);  
-        res.status(201).json({ 
+        res.status(200).json({ 
           metadata:{
             Name:Name,
             Version:Version,
@@ -1086,7 +1091,7 @@ export const updatePackage = async (req: Request, res: Response) => {
             JSProgram:JSProgram
           }
         });
-        console.log(`Package ${Name} version 1.0.0 uploaded successfully`);
+        console.log(`Update:Package ${Name} version ${Version} uploaded successfully`);
         if (fs.existsSync(path_after_unzipping)) {
           fs.rmSync(path_after_unzipping, { recursive: true, force: true });
         }
@@ -1113,7 +1118,7 @@ export const updatePackage = async (req: Request, res: Response) => {
           log(`${URL} is an NPM package.`);
           const package_name = get_npm_package_name(URL);
           const repoURL = await get_repo_url(package_name);
-          log(`The GitHub repo of the package is ${repoURL}`);
+          log(`Update:The GitHub repo of the package is ${repoURL}`);
 
           // Clone the repository
           await git.clone({
@@ -1124,10 +1129,10 @@ export const updatePackage = async (req: Request, res: Response) => {
             singleBranch: true,
             depth: 1,
           });
-          log(`Cloned ${repoURL} successfully.`);
+          log(`Update: Cloned ${repoURL} successfully.`);
 
           // Get package information
-          const packageName  = await getNameFromPackageJson(tempDir);
+          const packageName  = getNameFromPackageJson(tempDir);
           if (packageName =="no name"){
             Name=package_name
           }
@@ -1142,10 +1147,9 @@ export const updatePackage = async (req: Request, res: Response) => {
             id = packageMetaData.rows[0].id;
             key = `packages/${id}.zip`;
           }
-          URL = repoURL; // Update URL to GitHub repo URL
         } else {
           // GitHub URL provided directly
-          log(`We are cloning the package ${URL}`);
+          log(`Update: We are cloning the package ${URL}`);
 
           // Clone the repository
           await git.clone({
@@ -1156,10 +1160,10 @@ export const updatePackage = async (req: Request, res: Response) => {
             singleBranch: true,
             depth: 1,
           });
-          console.log(`Cloned ${URL} successfully.`);
+          console.log(`Update:Cloned ${URL} successfully.`);
 
           // Get package information
-          const packageName = await getNameFromPackageJson(tempDir);
+          const packageName =  getNameFromPackageJson(tempDir);
           if (packageName=="no name"){
             Name=getGitHubRepoNameFromUrl(URL) as string
           }
@@ -1188,14 +1192,14 @@ export const updatePackage = async (req: Request, res: Response) => {
         }
         const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
         await zipDirectory(tempDir, zipPath);
-        console.log(`Zipped repository to ${zipPath}`);
+        console.log(`Update:Zipped repository to ${zipPath}`);
         const fileStream = fs.createReadStream(zipPath);
         uploadZipToS3(key,fileStream,'application/zip')
         const zipFileContent = fs.readFileSync(zipPath);
         const base64Content = zipFileContent.toString('base64');
 
         await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
-        res.status(201).json({  
+        res.status(200).json({  
           metadata:{
             Name:Name,
             Version:Version,
@@ -1203,7 +1207,8 @@ export const updatePackage = async (req: Request, res: Response) => {
           },
           data:{
             Content:base64Content,
-            JSProgram:JSProgram
+            URL:URL,
+            JSProgram:JSProgram,
           }
         });
 
@@ -1215,6 +1220,7 @@ export const updatePackage = async (req: Request, res: Response) => {
       }
       else {
         res.status(400).json({ error: "The new name and the old name aren't the same" });
+        log("Update: the names are different")
       }
 
         if (fs.existsSync(tempDir)) {
@@ -1222,7 +1228,12 @@ export const updatePackage = async (req: Request, res: Response) => {
         }
     }
   }catch(err){
-    log(`internal server error ${err}`)
+    if (!id){
+      res.status(404).json("Package does not exist.")
+      log("Update: I entered the status 404")
+      return
+    }
+    log(`Update:internal server error ${err}`)
     await client.query("ROLLBACK")
     res.status(500).json({error:"internal server error"})
     return 
@@ -1318,6 +1329,12 @@ export const packageCost = async (req: Request, res: Response)=> {
       }
       await printingTheCost(id, Name, adj_list, client);
       package_data = await getPackageDependeciesByIDQuery(client,id);
+      if (!package_data){
+        console.error(`Package with id:${id} doesn't exist`);
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Package doesn't exist" });
+        return;
+      }
       console.log("da5al 5 ")
     }
 
@@ -1349,16 +1366,35 @@ export const packageCost = async (req: Request, res: Response)=> {
 
     await client.query("COMMIT");
 
-    res.status(200).json({
-      dependencies: {
-        id: id,
-        Dependencies: package_data.rows.map((row) => ({
-          Dependency: row.dependency,
-          ...(row.total_cost !== row.standalone_cost && { StandaloneCost: row.standalone_cost }),
-          TotalCost: row.total_cost,
-        })),
-      },
-    });
+    const mainPackage = package_data.rows[0];
+
+// Parse the main package id as a number to increment from it
+
+// Convert main package costs to numbers
+const mainPackageStandalone = Number(mainPackage.standalone_cost);
+const mainPackageTotal = Number(mainPackage.total_cost);
+
+const transformedData: Record<string, any> = {
+  [id]: {
+    ...(mainPackageStandalone !== mainPackageTotal && { standaloneCost: mainPackageStandalone/(1024*1024) }),
+    totalCost: mainPackageTotal/(1024*1024),
+  },
+};
+
+// Add dependencies, incrementing from id+1 upwards
+package_data.rows.slice(1).forEach((row: any, index: number) => {
+  const standalone = Number(row.standalone_cost);
+  const total = Number(row.total_cost);
+
+  const dependencyKey = (id + index + 1).toString();
+  transformedData[dependencyKey] = {
+    ...(standalone !== total && { standaloneCost: standalone/(1024*1024) }),
+    totalCost: total/(1024*1024),
+  };
+});
+
+res.status(200).json(transformedData);
+log(JSON.stringify(transformedData, null, 2));
 
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1369,13 +1405,16 @@ export const packageCost = async (req: Request, res: Response)=> {
     if (err  instanceof Error&& err.name === 'TokenExpiredError') {
       log(`Token expired:${err}` );
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken' });
+      
       return;
     }
     else if (!id){
       res.status(404).json({ error: 'Package does not exist.' });
+      log("error package not exist")
     }
     else {
       res.status(500).json({ error: 'The package rating system choked on at least one of the metrics.' });
+      log("error 500")
     }
   } finally {
     client.release();

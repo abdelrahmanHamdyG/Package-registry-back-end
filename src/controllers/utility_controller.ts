@@ -382,30 +382,28 @@ export const isValidIdFormat = (input: string): boolean => {
 
 
 
-export const getPackagesFromPackageJson=(dir: string): string[]=> {
+export const getPackagesFromPackageJson = (dir: string): string[] => {
   const packagesList: string[] = [];
-  const packageJsonPath=getPackageJson(dir)
-  if(packageJsonPath){
-    if (fs.existsSync(packageJsonPath)) {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const packageJsonPath = getPackageJson(dir);
 
-        // Extract dependencies and devDependencies if they exist
-        if (packageJson.dependencies) {
-            packagesList.push(...Object.keys(packageJson.dependencies));
-        }else{
-          if (packageJson.devDependencies) {
-              packagesList.push(...Object.keys(packageJson.devDependencies));
-          }
+  if (packageJsonPath) {
+    if (fs.existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+      // Extract dependencies if they exist
+      if (packageJson.dependencies) {
+        packagesList.push(...Object.keys(packageJson.dependencies));
       }
     } else {
-        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+      console.error(`No 'package.json' found at path: ${packageJsonPath}`);
     }
+  } else {
+    console.error(`error`);
   }
-  else {
-    console.error(`error`)
-  }
+
   return packagesList;
-}
+};
+
 export const getNameFromPackageJson=(dir: string): string=> {
   log("We are getting the name from package.json")
   const packageJsonPath=getPackageJson(dir)
