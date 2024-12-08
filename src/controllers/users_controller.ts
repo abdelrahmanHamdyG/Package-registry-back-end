@@ -98,6 +98,7 @@ export const authenticate = async (req: Request, res: Response) => {
       log(`missing user name or password`)
       return;
     }
+    console.log("we are here")
     const new_password=removeEscapingBackslashes(Secret.password)
     log(`password is ${new_password} instead of ${Secret.password}`)
     try {
@@ -107,7 +108,8 @@ export const authenticate = async (req: Request, res: Response) => {
         log(`userName ${User} is incorret`) 
         return;
       }
-  
+      
+      console.log("we are heree")
       const user = result.rows[0];
   
       // Verify the password

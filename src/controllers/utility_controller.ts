@@ -605,18 +605,4 @@ const markdownToText = async(markdown: string) => {
 
 
 
-const haltOnTimedout = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.timedout) next();
-};
 
-export const  requestTimeout = [
-  timeout(TIMEOUT_DURATION),
-  (req: Request, res: Response, next: NextFunction) => {
-    if (req.timedout) {
-      res.status(503).json({ error: 'Request timed out. Please try again.' });
-    } else {
-      next();
-    }
-  },
-  haltOnTimedout,
-];

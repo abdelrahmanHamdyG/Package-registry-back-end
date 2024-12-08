@@ -1,33 +1,32 @@
-import e, { Request, Response } from 'express';
+import  { Request, Response } from 'express';
 import http from "isomorphic-git/http/node/index.js";
 import * as git from 'isomorphic-git'
 import { promises as fss } from 'fs';
 import fs from 'fs'
 import jwt from 'jsonwebtoken';
-import os, { tmpdir, version } from "os"
-import path, { parse } from "path"
+import os from "os"
+import path from "path"
 import AdmZip from 'adm-zip' 
 import pool from '../db.js'; 
+import {log} from '../phase_1/logging.js'
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
-
-import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
-
+import { checkIfIamAdmin, debloat_file,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, printingTheCost, zipDirectory, encodeFileToBase64, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery, updateTokenQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageDependeciesByIDQuery, getPackageHistoryQuery ,getPackageNameByIDQuery,getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
-import {log} from '../phase_1/logging.js'
-
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 
+
+// function implementing the endpoint-->     (post) packges/
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
+
   const queries: Array<{ Name: string; Version?: string }> = req.body;
   const offset: number = parseInt(req.query.offset as string) || 0;
-  const packages: any[] = [];
   
   log('Request body for search packages queries', req.body);
   
-
+  // checking if the input is in the format
   if (
     !Array.isArray(queries) ||
     queries.some(
@@ -46,9 +45,11 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     return;
   }
 
+
+
   const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
-  // Check if the user can search
+  
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
@@ -56,37 +57,33 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     return;
   }
   
-  const result = await updateTokenQuery(token);
-
-  if (!result.rows.length) {
-    console.log("Token does not exist or was deleted:", token);
-    res.status(403).json({
-      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-    });
-    return;
-  }
   
-  
-  const usageCount = result.rows[0].usage_count;
-
-  if(usageCount>1000){
-    res.status(403).json({
-      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-    });
-  }
-
-
-  let queryText = 'SELECT * FROM package';
-  const queryParams: (string | number)[] = [];
-  const conditions: string[] = [];
 
   try {
+
+    // checking token limit (1000) call 
+    const resultTokenQuerey = await updateTokenQuery(token);
+    const usageCount = resultTokenQuerey.rows[0].usage_count;
+
+    if(usageCount>1000){
+      res.status(403).json({
+        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+      });
+      return 
+    }
+
+
+    let queryText = 'SELECT * FROM package';
+    const queryParams: (string | number)[] = [];
+    const conditions: string[] = [];
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
 
     const isAdmin = await checkIfIamAdmin(req);
     const canISearchFlag = await canISearchQuery(userId);
 
+
+    // Check if the user can search
     if (canISearchFlag.rows.length === 0 && isAdmin !== 1) {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
       log("token is missing in search packages by queries")
@@ -1604,3 +1601,5 @@ log(JSON.stringify(transformedData, null, 2));
     client.release();
   }
 };
+
+
