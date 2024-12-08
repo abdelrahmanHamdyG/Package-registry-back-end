@@ -8,7 +8,6 @@ const router = Router();
 
 
 
-// Baseline end points
 router.get("/package/:id/rate", getPackageRating);
 router.post("/packages", searchPackagesByQueries);
 router.get("/package/:id", getPackageByID);
