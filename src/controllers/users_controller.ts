@@ -89,7 +89,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
   };
   
   
-export const authenticate = async (req: Request, res: Response) => {
+  export const authenticate = async (req: Request, res: Response) => {
     const { User, Secret } = req.body;
     log(`we start authenticating with User ${User} and Secret: ${Secret}`)
   
@@ -98,7 +98,8 @@ export const authenticate = async (req: Request, res: Response) => {
       log(`missing user name or password`)
       return;
     }
-  
+    const new_password=removeEscapingBackslashes(Secret.password)
+    log(`password is ${new_password} instead of ${Secret.password}`)
     try {
       const result = await getAllUsersWithNameQuery(User.name);
       if (result.rows.length == 0) {
@@ -110,10 +111,11 @@ export const authenticate = async (req: Request, res: Response) => {
       const user = result.rows[0];
   
       // Verify the password
-      const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
+      
+      const isPasswordValid = await bcrypt.compare(new_password, user.password_hash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        log(`password is ${Secret.password}`)
+        
         log(`password for userName ${User.name} is incorret`)
         return;
       }
@@ -135,14 +137,15 @@ export const authenticate = async (req: Request, res: Response) => {
       // Send the token back to the user
       res.type("text/plain");
       
-      res.send( `Bearer ${token}` );
+      res.send(` Bearer ${token} `);
     } catch (err) {
       log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
     }
-  };
-  
-  
+  };  
+  export function removeEscapingBackslashes(password:string) {
+    return password.replace(/\\(.)/g, '$1');
+  }
 
 export const logout = async (req: Request, res: Response) => {
     // const authHeader = req.headers['x-authorization'] as string;
