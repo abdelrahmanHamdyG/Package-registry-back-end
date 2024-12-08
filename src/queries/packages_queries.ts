@@ -168,33 +168,19 @@ export const getPackageRatingQuery = (packageID: number) => {
 
 
 export const searchPackagesByRegExQuery = async(client:PoolClient,regex: string,group_id:number) => {
+  
   const query = `
-    SELECT id, name, version
-    FROM package
-    WHERE name ~* $1
-      AND (
-        group_id IS NULL
-        OR group_id = $2
-      )
-  `
+      SELECT p.id, p.name, p.version
+  FROM package p
+  LEFT JOIN package_data pd ON p.id = pd.package_id
+  WHERE (p.name ~ $1
+    OR pd.readme ~ $1) AND (group_id IS NULL OR group_id= $2);
+
+    `;
   return await client.query(query, [regex,group_id]);
 };
 export const searchPackagesByRegExQueryForAdminQuery = async (client: PoolClient, regex: string): Promise<any> => {
   try {
-    // Step 1: Sanitize the regex to cap large repetition counts
-    // const sanitizedRegex = sanitizeRegexRepetition(regex);
-
-    // // Step 2: Determine if it's a full match regex
-    // const fullMatch = isFullMatchRegex(sanitizedRegex);
-
-    // // Step 3: Modify the regex for substring matching if needed
-    // const modifiedRegex = modifyRegexForSubstringMatch(sanitizedRegex, fullMatch);
-
-    // // Log the modifications
-    // console.log(`Modified regex is ${modifiedRegex}`);
-    // if (regex !== modifiedRegex) {
-    //   console.warn(`Regex sanitized: ${regex} -> ${modifiedRegex}`);
-    // }
 
     // Step 4: Execute the query with the modified regex
     console.log(`regex is ${regex}`)

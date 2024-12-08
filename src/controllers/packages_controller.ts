@@ -11,7 +11,7 @@ import pool from '../db.js';
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
 
-import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync } from './utility_controller.js';
+import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
 
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
@@ -717,20 +717,7 @@ try {
     const userGroupResult = await getUserGroupQuery(userId);
     const userGroupId = userGroupResult.rows.length > 0 ? userGroupResult.rows[0].group_id : null;
 
-    const sanitizedRegex = sanitizeRegexRepetition(RegEx);
-
-    // Automatically detect if the regex is for a full match
-    const fullMatch = isFullMatchRegex(sanitizedRegex);
-
-    // Modify the regex for full match if needed
-    const modifiedRegex = fullMatch ? sanitizedRegex : `.*${sanitizedRegex}.*`;
-
-    // Log if the regex was modified
-    console.log(`modified regex is ${modifiedRegex}`)
-    if (RegEx !== modifiedRegex) {
-      console.warn(`Regex sanitized: ${RegEx} -> ${modifiedRegex}`);
-    }
-
+    
     
 
     const packageMetaData = await searchPackagesByRegExQuery(client,RegEx,userGroupId);
@@ -764,19 +751,7 @@ try {
 
     // he is an admin
     log(`I am an admin`)
-    // const sanitizedRegex = sanitizeRegexRepetition(RegEx);
-
-    // // Automatically detect if the regex is for a full match
-    // const fullMatch = isFullMatchRegex(sanitizedRegex);
-
-    // // Modify the regex for full match if needed
-    // const modifiedRegex = fullMatch ? sanitizedRegex : sanitizedRegex.startsWith('.*') ? sanitizedRegex : `.*${sanitizedRegex}.*`;
     
-    // // Log if the regex was modified
-    // console.log(`modified regex is ${modifiedRegex}`)
-    // if (RegEx !== modifiedRegex) {
-    //   console.warn(`Regex sanitized: ${RegEx} -> ${modifiedRegex}`);
-    // }
 
     
     const packageMetaData = await searchPackagesByRegExQueryForAdminQuery(client,RegEx);

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Request, Response } from "express";
 import { trackDetails,} from "./controllers/utility_controller.js";  // Ensure the correct path
 import { getPackageByID, getPackageHistory, getPackageRating, packageCost, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controllers/packages_controller.js";
-import { authenticate, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
+import { authenticate, enforceTokenUsage, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
 import { assignPackageToGroup, assignUserToGroup, createGroup, getAllGroups, getUsersByGroup } from "./controllers/groups_controller.js";
 
 const router = Router();
@@ -11,6 +11,14 @@ const router = Router();
 router.get("", (req: Request, res: Response) => {
   res.send("You are not at a valid endpoint. Try using '/package' or other routes.");
 });
+
+
+router.put("/authenticate",authenticate)
+
+router.post("/logout/",logout)
+
+router.use(enforceTokenUsage)
+
 
 router.get("/package/:id/cost",packageCost)
 
@@ -40,7 +48,6 @@ router.post("/package/:id", updatePackage);
 router.post("/package", uploadPackage);
 
 
-router.put("/authenticate",authenticate)
 router.get("/tracks",trackDetails)
 router.post("/register",registerNewUser)
 
@@ -50,7 +57,6 @@ router.post("/add_package/:groupid",assignPackageToGroup)
 
 router.get("/groups",getAllGroups)
 router.get("/groups/:groupid",getUsersByGroup)
-router.post("/logout/",logout)
 
 router.post("/history",getPackageHistory)
 // POST /package/byRegEx - Search packages by regular expression

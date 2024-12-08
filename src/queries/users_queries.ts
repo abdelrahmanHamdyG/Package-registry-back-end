@@ -171,3 +171,17 @@ export const canUserAccessPackageQuery  = async (userId: number, packageId: numb
 
       return await client.query(insertUserQuery, [name, password_hash, is_admin || false,can_download,can_search,can_upload]);
   }
+
+
+export const updateTokenQuery=async(token:string)=>{
+
+  const updateQuery = `
+  UPDATE user_tokens
+  SET usage_count = usage_count + 1
+  WHERE token = $1
+  RETURNING usage_count
+`;
+  return await pool.query(updateQuery, [token]);
+
+}
+
