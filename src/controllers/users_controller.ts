@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import e, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../db.js'; 
-import { checkIfIamAdmin } from './utility_controller.js';
+import { checkIfIamAdmin, removeEscapingBackslashes } from './utility_controller.js';
 import {  getAllUsersWithNameQuery, getUserAccessQuery, getUserWithUserNameQuery, insertToUserTokenQuery, insertUserToUsersQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
 import { doesGroupExistQuery, insertUserToGroupQuery } from '../queries/groups_queries.js';
 import {log} from '../phase_1/logging.js'
@@ -98,7 +98,8 @@ export const authenticate = async (req: Request, res: Response) => {
       log(`missing user name or password`)
       return;
     }
-  
+    const new_password=removeEscapingBackslashes(Secret.password)
+    log(`password is ${new_password} instead of ${Secret.password}`)
     try {
       const result = await getAllUsersWithNameQuery(User.name);
       if (result.rows.length == 0) {
@@ -110,10 +111,11 @@ export const authenticate = async (req: Request, res: Response) => {
       const user = result.rows[0];
   
       // Verify the password
-      const isPasswordValid = await bcrypt.compare(Secret.password, user.password_hash);
+      
+      const isPasswordValid = await bcrypt.compare(new_password, user.password_hash);
       if (!isPasswordValid) {
         res.status(401).json({ error: 'The user or password is invalid.' });
-        log(`password is ${Secret.password}`)
+        
         log(`password for userName ${User.name} is incorret`)
         return;
       }

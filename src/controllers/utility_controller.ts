@@ -6,6 +6,8 @@ import fs from 'fs'
 import {minify} from 'terser'
 import { promises as fss } from 'fs';
 import jwt from 'jsonwebtoken';
+import { marked } from 'marked';
+
 import path, { parse } from "path"
 import archiver from "archiver";
 import pool from '../db.js'; 
@@ -474,3 +476,88 @@ export async function encodeFileToBase64(filePath:string) {
     throw error;
   }
 }
+
+
+export const sanitizeRegexRepetition = (regex: string, maxRepetition: number = 50): string => {
+  // Match patterns like {min,max}, {min,}, {,max}, or {n}
+  return regex.replace(/(\{\s*\d*\s*,?\s*)(\d+)?\s*}/g, (match, prefix, upperBound) => {
+    if (upperBound) {
+      const sanitizedUpperBound = Math.min(parseInt(upperBound, 10), maxRepetition);
+      return `${prefix}${sanitizedUpperBound}}`;
+    }
+    // If no upper bound is specified, set it to maxRepetition
+    return `${prefix}${maxRepetition}}`;
+  });
+};
+
+export const isFullMatchRegex = (regex: string): boolean => {
+  // Check if the regex explicitly starts with ^ and ends with $
+  const fullMatchExplicit = regex.startsWith('^') && regex.endsWith('$');
+
+  return fullMatchExplicit;
+};
+
+
+export const modifyRegexForSubstringMatch = (regex: string, isFullMatch: boolean): string => {
+  if (isFullMatch) {
+    return regex; // No modification needed for full match
+  }
+
+  let modifiedRegex = regex;
+
+  // Add .* to the start if not present
+  if (!/^(\.\*)/.test(modifiedRegex)) {
+    modifiedRegex = `.*${modifiedRegex}`;
+  }
+
+  // Add .* to the end if not present
+  if (!/(\.\*)$/.test(modifiedRegex)) {
+    modifiedRegex = `${modifiedRegex}.*`;
+  }
+
+  return modifiedRegex;
+};
+
+export function removeEscapingBackslashes(password:string) {
+  return password.replace(/\\(.)/g, '$1');
+}
+
+
+export const extractReadmeAsync = async (extractedPath: string): Promise<string | null> => {
+  try {
+    const files = await fss.readdir(extractedPath); // Read files in the extracted directory
+    const readmeFile = files.find((file) => file.toLowerCase().startsWith('readme')); // Locate README
+
+    if (readmeFile) {
+      const readmePath = path.join(extractedPath, readmeFile);
+
+      // Await the promise returned by readFile
+      const readmeContent = await fss.readFile(readmePath, 'utf8');
+      log(`README file found: ${readmePath}`);
+
+      // Convert Markdown to plain text
+      const plainTextReadme = await markdownToText(readmeContent);
+
+      // Return the plain text content
+      return plainTextReadme;
+    }
+
+    log(`No README file found in extracted package`);
+    return null;
+  } catch (error) {
+    console.error(`Error processing README: ${error}`);
+    return null;
+  }
+};
+
+
+const markdownToText = async(markdown: string) => {
+  // Convert Markdown to HTML
+  const htmlContent = await marked(markdown);
+
+  // Strip HTML tags to get plain text
+  const plainText = htmlContent.replace(/<[^>]*>/g, '');
+
+  return plainText.trim();
+};
+

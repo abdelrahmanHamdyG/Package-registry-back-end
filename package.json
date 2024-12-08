@@ -26,6 +26,7 @@
     "express": "^4.21.1",
     "isomorphic-git": "^1.27.1",
     "jsonwebtoken": "^9.0.2",
+    "marked": "^15.0.3",
     "pg": "^8.13.0",
     "terser": "^5.36.0",
     "typescript": "^5.6.3"

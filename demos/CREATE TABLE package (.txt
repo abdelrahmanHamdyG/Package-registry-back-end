@@ -14,6 +14,7 @@ CREATE TABLE package_data (
     debloat BOOLEAN,
     js_program TEXT,
     //                       CONSTRAINT package_data_content_or_url CHECK ((content IS NOT NULL) OR (url IS NOT NULL))
+    
 );
 
 CREATE TABLE user_account (
