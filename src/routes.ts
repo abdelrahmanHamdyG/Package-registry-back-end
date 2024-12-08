@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { trackDetails,} from "./controllers/utility_controller.js";  // Ensure the correct path
+import { requestTimeout, trackDetails,} from "./controllers/utility_controller.js";  // Ensure the correct path
 import { getPackageByID, getPackageHistory, getPackageRating, packageCost, resetRegistry, searchPackageByRegex, searchPackagesByQueries, updatePackage, uploadPackage } from "./controllers/packages_controller.js";
-import { authenticate, enforceTokenUsage, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
+import { authenticate, getUserAccess, logout, registerNewUser, updateUserAccess } from "./controllers/users_controller.js";
 import { assignPackageToGroup, assignUserToGroup, createGroup, getAllGroups, getUsersByGroup } from "./controllers/groups_controller.js";
 
 const router = Router();
@@ -13,11 +13,12 @@ router.get("", (req: Request, res: Response) => {
 });
 
 
+
+router.use(requestTimeout)
 router.put("/authenticate",authenticate)
 
 router.post("/logout/",logout)
 
-router.use(enforceTokenUsage)
 
 
 router.get("/package/:id/cost",packageCost)

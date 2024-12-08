@@ -1,5 +1,5 @@
 // controller.ts
-import e, { Request, Response } from 'express';
+import e, { NextFunction, Request, Response } from 'express';
 import axios from 'axios';
 
 import fs from 'fs'
@@ -13,7 +13,11 @@ import archiver from "archiver";
 import pool from '../db.js'; 
 import {log} from '../phase_1/logging.js'
 import { PoolClient } from 'pg';
+import timeout from 'connect-timeout';
 import { insertPackageDependency } from '../queries/packages_queries.js';
+
+
+const TIMEOUT_DURATION = '600s'; 
 
 
 export const checkIfIamAdmin = async (req: Request)=>{
@@ -599,3 +603,20 @@ const markdownToText = async(markdown: string) => {
   return plainText.trim();
 };
 
+
+
+const haltOnTimedout = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.timedout) next();
+};
+
+export const  requestTimeout = [
+  timeout(TIMEOUT_DURATION),
+  (req: Request, res: Response, next: NextFunction) => {
+    if (req.timedout) {
+      res.status(503).json({ error: 'Request timed out. Please try again.' });
+    } else {
+      next();
+    }
+  },
+  haltOnTimedout,
+];
