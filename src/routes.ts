@@ -17,7 +17,7 @@ router.put("/authenticate",authenticate)
 
 router.post("/logout/",logout)
 
-router.use(enforceTokenUsage)
+//router.use(enforceTokenUsage)
 
 
 router.get("/package/:id/cost",packageCost)

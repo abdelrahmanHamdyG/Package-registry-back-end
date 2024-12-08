@@ -137,7 +137,7 @@ export const authenticate = async (req: Request, res: Response) => {
       // Send the token back to the user
       res.type("text/plain");
       
-      res.send(` Bearer ${token} `);
+      res.status(200).send(` Bearer ${token} `);
     } catch (err) {
       log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
@@ -146,20 +146,8 @@ export const authenticate = async (req: Request, res: Response) => {
   
 
 export const logout = async (req: Request, res: Response) => {
-    // const authHeader = req.headers['x-authorization'] as string;
-    // const token = authHeader && authHeader.split(' ')[1];
   
-    // if (!token) {
-    //   res.status(400).json({ error: 'Token is missing.' });
-    //   return;
-    // }
-  
-    try {
-      // const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-      
-      
-      // await removeUserTokenQuery(token);
-  
+    try {  
       res.status(200).json({ message: 'Logged out successfully.' });
     } catch (err) {
       log(`Error during logout:${err}`);

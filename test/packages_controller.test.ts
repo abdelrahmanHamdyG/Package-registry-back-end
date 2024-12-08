@@ -69,91 +69,88 @@ insertToPackageHistoryRatingQuery:vi.fn()
 
 
 
-describe("searchPacakgeByQueries",()=>{
-    let req: Partial<Request>;
-    let res: Partial<Response>;
-  
-    beforeEach(() => {
-      req = {
-        body: [
-          { Name: 'package1', Version: '^1.0.0' },
-          { Name: 'package2', Version: '~2.3.0' },
-        ],
-        query: { offset: '0' },
-        headers: { authorization: 'Bearer token' },
-      };
-      res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-        setHeader: vi.fn(),
-      };
+describe('searchPackagesByQueries', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+
+  beforeEach(() => {
+    req = {
+      body: [
+        { Name: 'package1', Version: '^1.0.0' },
+        { Name: 'package2', Version: '~2.3.0' },
+      ],
+      query: { offset: '0' },
+      headers: { 'x-authorization': 'Bearer token' },
+    };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+      setHeader: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return 200 with packages if user is allowed to search', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
+    (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
+    (pool.query as vi.Mock).mockResolvedValue({
+      rows: [{ id: 1, name: 'package1', version: '1.0.0' }],
     });
-  
-    afterEach(() => {
-      vi.clearAllMocks();
+
+    await searchPackagesByQueries(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([{ ID: '1', Name: 'package1', Version: '1.0.0' }]);
+    expect(res.setHeader).toHaveBeenCalledWith('offset', 10);
+  });
+
+  it('should return 400 if queries are invalid', async () => {
+    req.body = [{ Name: 1 }]; // Missing 'Version'
+    await searchPackagesByQueries(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
     });
-    
+  });
 
-    it('should return 200 with packages if user is allowed to search', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
-        (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
-        (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
-        (pool.query as vi.Mock).mockResolvedValue({ rows: [{ id: 1, name: 'package1' }] });
-    
-        await searchPackagesByQueries(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({ packages: [{ id: 1, name: 'package1' }] });
-        expect(res.setHeader).toHaveBeenCalledWith('offset', 10);
-      });
-    
+  it('should return 403 if token is missing', async () => {
+    req.headers = {};
+    await searchPackagesByQueries(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
 
-    it('should return 400 if queries are invalid', async () => {
-        req.body = [{ Name: 'package1' }]; // Missing 'Version'
-        await searchPackagesByQueries(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
-        });
-      });
-    
-    it('should return 403 if token is missing', async () => {
-        req.headers = {};
-        await searchPackagesByQueries(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-        });
-      });
-    
+  it('should return 405 if user is not allowed to search', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
 
-    it('should return 403 if user is not allowed to search', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
-        (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
-    
-        await searchPackagesByQueries(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(405);
-        expect(res.json).toHaveBeenCalledWith('user not allowed to search');
-      });
-    
-    
-    it('should handle internal server errors and return 500', async () => {
-        (jwt.verify as vi.Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
-    
-        await searchPackagesByQueries(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-      });
-    
+    await searchPackagesByQueries(req as Request, res as Response);
 
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'User not allowed to search',
+    });
+  });
 
-})
+  it('should handle internal server errors and return 500', async () => {
+    (jwt.verify as vi.Mock).mockImplementation(() => {
+      throw new Error('Invalid token');
+    });
+
+    await searchPackagesByQueries(req as Request, res as Response);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+  });
+});
 
 
 
@@ -169,7 +166,7 @@ describe("resetRegistry",()=>{
           { Name: 'package2', Version: '~2.3.0' },
         ],
         query: { offset: '0' },
-        headers: { authorization: 'Bearer token' },
+        headers: { 'x-authorization': 'Bearer token' },
       };
       res = {
         status: vi.fn().mockReturnThis(),
@@ -256,7 +253,7 @@ describe("getPackageById",()=>{
     beforeEach(() => {
       req = {
         params: { id: "45" },
-        headers: { authorization: 'Bearer fakeToken' },
+        headers: { 'x-authorization': 'Bearer fakeToken' },
       };
       res = {
         status: vi.fn().mockReturnThis(),
@@ -272,8 +269,6 @@ describe("getPackageById",()=>{
     it('should return 200 with package metadata and content if all checks pass', async () => {
         const fakeZipContent = Buffer.from('fakeContent', 'utf8');
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        
-
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(true);
         (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
         (getPackageByIDQuery as vi.Mock).mockResolvedValue({
@@ -311,7 +306,7 @@ describe("getPackageById",()=>{
     
     it('should return 403 if authentication token is missing', async () => {
         if(req.headers)
-        req.headers.authorization = '';
+        req.headers['x-authorization'] = '';
         await getPackageByID(req as Request, res as Response);
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
@@ -388,7 +383,7 @@ describe("searchPackageByRegex",()=>{
     beforeEach(() => {
       req = {
         body: { RegEx: '^package.*' },
-        headers: { authorization: 'Bearer fakeToken' },
+        headers: { 'x-authorization': 'Bearer fakeToken' },
       };
       res = {
         status: vi.fn().mockReturnThis(),
@@ -416,10 +411,10 @@ describe("searchPackageByRegex",()=>{
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith([
           {
-            metadata: { Name: 'package1', Version: '1.0.0', ID: 1 },
+             Name: 'package1', Version: '1.0.0', ID: 1 
           },
           {
-            metadata: { Name: 'package2', Version: '2.0.0', ID: 2 },
+            Name: 'package2', Version: '2.0.0', ID: 2
           },
         ]);
       });
@@ -439,11 +434,12 @@ describe("searchPackageByRegex",()=>{
     
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith([
-          {
-            metadata: { Name: 'package3', Version: '3.0.0', ID: 3 },
-          },
+            {
+              Name: 'package3', Version: '3.0.0', ID: 3
+            },
         ]);
-      });
+        
+        });
 
     it('should return 403 if the token is missing', async () => {
         req.headers = {};
@@ -455,14 +451,14 @@ describe("searchPackageByRegex",()=>{
         });
       });
     
-    it('should return 405 if the user is not allowed to search', async () => {
+    it('should return 403 if the user is not allowed to search', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
         (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
     
         await searchPackageByRegex(req as Request, res as Response);
     
-        expect(res.status).toHaveBeenCalledWith(405);
+        expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
           error: 'sorry you don\'t have access to search with this regex ',
         });
@@ -483,16 +479,16 @@ describe("searchPackageByRegex",()=>{
         });
       });
 
-    it('should return 500 if an error occurs during execution', async () => {
+    it('should return 400 if an error occurs during execution', async () => {
         (jwt.verify as vi.Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
     
         await searchPackageByRegex(req as Request, res as Response);
     
-        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
-          error: 'Internal Server Error',
+          error: 'There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)',
         });
       });
     
@@ -510,7 +506,7 @@ describe("getPackageHistory",()=>{
   beforeEach(() => {
     req = {
       body: { id: 45 },
-      headers: { authorization: 'Bearer fakeToken' },
+      headers: { 'x-authorization': 'Bearer fakeToken' },
     };
     res = {
       status: vi.fn().mockReturnThis(),
@@ -621,7 +617,7 @@ describe("getPackageRating",()=>{
   beforeEach(() => {
     req = {
       params: { id: '45' },
-      headers: { authorization: 'Bearer fakeToken' },
+      headers: { 'x-authorization': 'Bearer fakeToken' },
     };
     res = {
       status: vi.fn().mockReturnThis(),

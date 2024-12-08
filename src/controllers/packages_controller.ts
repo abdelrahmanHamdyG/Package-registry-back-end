@@ -519,7 +519,6 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
   const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
-  
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     log(`GettingPacakgeByID: Unauthorized: Token missing.`)
