@@ -174,9 +174,9 @@ export const processUrl = async (url: string) => {
         0.15 * metrics.RampUp +
         0.15 * metrics.Correctness +
         0.1 * metrics.BusFactor +
-        0.2 * metrics.ResponsiveMaintainer +
+        0.3 * metrics.ResponsiveMaintainer +
         0.1 * metrics.License.score+
-        0.1*metrics.dependency+
+        0.1* metrics.dependency+
         0.1 * metrics.CodeReview
     );
 

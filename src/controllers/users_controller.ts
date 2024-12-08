@@ -89,7 +89,7 @@ export const registerNewUser = async (req: Request, res: Response) => {
   };
   
   
-export const authenticate = async (req: Request, res: Response) => {
+  export const authenticate = async (req: Request, res: Response) => {
     const { User, Secret } = req.body;
     log(`we start authenticating with User ${User} and Secret: ${Secret}`)
   
@@ -137,14 +137,15 @@ export const authenticate = async (req: Request, res: Response) => {
       // Send the token back to the user
       res.type("text/plain");
       
-      res.send( `Bearer ${token}` );
+      res.send(` Bearer ${token} `);
     } catch (err) {
       log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
     }
-  };
-  
-  
+  };  
+  export function removeEscapingBackslashes(password:string) {
+    return password.replace(/\\(.)/g, '$1');
+  }
 
 export const logout = async (req: Request, res: Response) => {
     // const authHeader = req.headers['x-authorization'] as string;

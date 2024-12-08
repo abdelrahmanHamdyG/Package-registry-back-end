@@ -394,6 +394,7 @@ export const getPackagesFromPackageJson = (dir: string): string[] => {
       if (packageJson.dependencies) {
         packagesList.push(...Object.keys(packageJson.dependencies));
       }
+
     } else {
       console.error(`No 'package.json' found at path: ${packageJsonPath}`);
     }
@@ -432,6 +433,43 @@ export const getNameFromPackageJson=(dir: string): string=> {
   }
   log(`the returned name is ${packageName}`)
   return packageName;
+}
+export const getURLFromPackageJson=(dir: string): string=> {
+  log("We are getting the name from package.json")
+  const packageJsonPath=getPackageJson(dir)
+  let packageURL = ''as string;
+  if(packageJsonPath){
+    if (fs.existsSync(packageJsonPath)) {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+        // Extract dependencies and devDependencies if they exist
+        if (packageJson.url ){
+          packageURL=packageJson.url
+        }
+        else if (packageJson.Url){
+          packageURL=packageJson.Url
+        }
+        else if (packageJson.repository && packageJson.repository.url) {
+          const repoUrl = packageJson.repository.url; // git://github.com/dominictarr/JSONStream.git
+           packageURL = repoUrl
+            .replace(/^git:\/\//, 'https://')  // Replace 'git://' with 'https://'
+            .replace(/\.git$/, '') 
+            .replace(/^git\+/, "");      // Remove the '.git' at the end
+          console.log(`You can view the repository at: ${packageURL}`);
+        }
+        else {
+          packageURL="no url"
+          console.error('There is no url in package.json');
+        }
+    } else {
+        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+    }
+  }
+  else {
+    console.error(`error`)
+  }
+  log(`the returned url is ${packageURL}`)
+  return packageURL;
 }
 
 

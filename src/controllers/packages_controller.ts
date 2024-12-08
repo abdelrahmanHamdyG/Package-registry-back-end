@@ -10,7 +10,9 @@ import AdmZip from 'adm-zip'
 import pool from '../db.js'; 
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
+
 import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync } from './utility_controller.js';
+
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageDependeciesByIDQuery, getPackageHistoryQuery ,getPackageNameByIDQuery,getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
@@ -248,7 +250,32 @@ export const uploadPackage = async (req: Request, res: Response) => {
       const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
       const zip = new AdmZip(zipPath);
       zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
+
       const readmeContent=await extractReadmeAsync(path_after_unzipping)
+
+
+      let obtainedurl=getURLFromPackageJson(path_after_unzipping)
+      if (obtainedurl!='no url'){
+        const metrics=await processUrl(obtainedurl)
+        log(`content Upload: Metics Calculated for ${obtainedurl}: `)
+        if ((metrics?.NetScore||0)<0.42){
+          log(`content Upload:Package ${Name} is disqualified with Net score equal ${metrics?.NetScore}
+          , rampUp ${metrics?.RampUp}, busfactor${metrics?.BusFactor}, licenece${metrics?.License}, dependency${metrics?.Dependency},
+           code review${metrics?.CodeReview}, correctness${metrics?.Correctness},responsiveness${metrics?.ResponsiveMaintainer}`)
+           res.status(424).json({"error":"disqualified package"})
+          return 
+        }
+        log(`content upload:Package ${Name} is qualified`)
+        await insertPackageRatingQuery(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
+          ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
+          ,metrics?.Dependency,metrics?.CodeReview,metrics?.Correctness_Latency,metrics
+          ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
+          ?.License_Latency,metrics?.DependencyLatency,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
+        );
+      }
+      else{
+        await insertPackageRatingQuery(client, id)
+      }
 
       if (debloat) {
         await debloat_file(path_after_unzipping); // Use your debloat/minification function
@@ -263,7 +290,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       log(`we uploaded ${Name} to S3 `)
       await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
       log(`we inserted ${Name} to PackageData `)
-      await insertPackageRatingQuery(client,id);
+      
       log(`we inserted ${Name} to Package Rating with default values as it is content`)
       res.status(201).json({
         metadata:{
@@ -892,41 +919,35 @@ export const getPackageRating=async (req:Request,res:Response)=>{
   const regex = /^[a-zA-Z0-9\-]+$/;
 
   
-  if(!packageIdRead || !regex.test(packageIdRead)){
-
-    log("rating:we can't read the package or the id is not valid for the regex" )
-    res.status(400).json({"error":"There is missing field(s) in the PackageID"})
-    return
-  }
 
 
-
-  const packageId=Number(packageIdRead)
-  log("rarting:package rating is called with id ", packageId)
-
-
-  if(isNaN(packageId)){
-    log("rating: package doesn't exists")
-    res.status(404).json({"error":"Package does not exist."})
-    return
-  }
-
-
-  log(`we are getting package rating for package id ${packageId}`)
+  
   const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    log(`rating: Unauthorized: Token missing.`)
+    log(`ratingcheck: Unauthorized: Token missing.`)
     return
   }
 
 
   try{
-
-
-
+    log(`rating check: package id is ${packageIdRead}`)
+    if(!packageIdRead || !regex.test(packageIdRead)){
+      log("rating check: we can't read the package or the id is not valid for the regex" )
+      res.status(400).json({"error":"There is missing field(s) in the PackageID"})
+      return
+    }
+    const packageId=Number(packageIdRead)
+    log("rarting check: package rating is called with id ", packageId)
+    
+    if(isNaN(packageId)){
+      log("rating: package doesn't exists")
+      res.status(404).json({error:"Package does not exist."})
+      return
+    }
+    log(`we are getting package rating for package id ${packageId}`)
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
     const isAdmin=await checkIfIamAdmin(req)
@@ -934,9 +955,8 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     const result=await canISearchQuery(userId)    
     
     if(result.rows.length==0&&isAdmin!=1){
-
       res.status(403).json({"error":"Authentication failed due to invalid or missing AuthenticationToken."})
-      log(`rating:no thing returned from the table for user ${userId}`)
+      log(`rating check:no thing returned from the table for user ${userId}`)
       return
     }
 
@@ -944,28 +964,28 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     if(!canISearchBool && isAdmin!=1){
 
       res.status(402).json({"error":"sorry you are not allowed to get the rating "})
-      log(`rating:sorry you  ${userId} are not allowed to get the rating `)
+      log(`rating check:sorry you  ${userId} are not allowed to get the rating `)
       return
     }
 
 
-    log("rating: we are calling can userAccessPackageQuery")
+    log("rating check: we are calling can userAccessPackageQuery")
     const same_group_id=await canUserAccessPackageQuery(userId,packageId)
 
     if(!same_group_id && isAdmin!=1){
       res.status(402).json({"error":"sorry you are not allowed to get the rating of this package"})
-      log(`rating:sorry you are not allowed to get the rating of this package${userId}`)
+      log(`rating check:sorry you are not allowed to get the rating of this package${userId}`)
       return
 
     }
-    log("rating: you are admin you can access the rating")
+    log("rating check: you are admin you can access the rating")
 
     const metrics=await getPackageRatingQuery(packageId)  
 
     if (metrics.rows.length==0){
 
       res.status(404).json({error:"Package doesn't exists"})
-      log(`rating:packageRating: package doesn't exist with id ${packageId}`)
+      log(`rating check:packageRating: package doesn't exist with id ${packageId}`)
       return
     }
 
@@ -988,11 +1008,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
       NetScore: Number(metrics.rows[0].net_score),
       NetScoreLatency: Number(metrics.rows[0].net_score_latency)
     };
-    log("rating: package rating for package with id "+ packageId +" is: "+ JSON.stringify(packageRating))
+    log("rating check: package rating for package with id "+ packageId +" is: "+ JSON.stringify(packageRating))
     if(metrics.rows[0].ramp_up==-1||metrics.rows[0].correctness==-1||metrics.rows[0].bus_factor==-1||metrics.rows[0].responsive_maintainer==-1
       ||metrics.rows[0].license_score==-1||metrics.rows[0].pull_request==-1||metrics.rows[0].good_pinning_practice==-1
     ){
-      log("rating:chocked on at least one of the metrics")
+      log("rating check:chocked on at least one of the metrics")
       res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
       return
     }
@@ -1004,11 +1024,11 @@ export const getPackageRating=async (req:Request,res:Response)=>{
     } catch (error) {
 
       if (error instanceof Error&& error.message === 'TokenExpiredError') {
-        log(`rating: Token expired:${error}` );
+        log(`rating check: Token expired:${error}` );
         res.status(403).json({ error: 'Token has expired.' });
         return;
       }
-      log(`rating:Error fetching package rating:${error}`, );
+      log(`rating check:Error fetching package rating:${error}`, );
       if (error instanceof Error) {
           res.status(500).json({ message: `Internal server error: ${error.message}` });
       }
@@ -1126,7 +1146,30 @@ export const updatePackage = async (req: Request, res: Response) => {
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
         log("Update:Unzipped content to temporary directory.");
+
         const readmeContent=await extractReadmeAsync(path_after_unzipping)
+
+        let obtainedurl=getURLFromPackageJson(path_after_unzipping)
+        if (obtainedurl!='no url'){
+          const metrics=await processUrl(obtainedurl)
+          log(`content Upload: Metics Calculated for ${obtainedurl}: `)
+          if ((metrics?.NetScore||0)<0.5){
+            res.status(424).json({"error":"disqualified package"})
+            log(`content Upload:Package ${Name} is disqualified`)
+            return 
+          }
+          log(`content upload:Package ${Name} is qualified`)
+          await insertPackageRatingQuery(client, id,metrics?.Correctness,metrics?.ResponsiveMaintainer
+            ,metrics?.RampUp,metrics?.BusFactor,metrics?.License
+            ,metrics?.Dependency,metrics?.CodeReview,metrics?.Correctness_Latency,metrics
+            ?.ResponsiveMaintainer_Latency,metrics?.RampUp_Latency,metrics?.BusFactor_Latency,metrics
+            ?.License_Latency,metrics?.DependencyLatency,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
+          ); 
+        }
+        else {
+          await insertPackageRatingQuery(client, id)
+        }
+
         if (debloat) {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
           log("Update:Debloated package contents.");
@@ -1136,8 +1179,13 @@ export const updatePackage = async (req: Request, res: Response) => {
         const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
         const base64FinalContent = finalZipContent.toString('base64');
         await uploadBase64ToS3(base64FinalContent,  key);    
+
         await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
         await insertPackageRatingQuery(client,id);  
+
+        
+        
+
         res.status(200).json({ 
           metadata:{
             Name:Name,
@@ -1365,7 +1413,7 @@ export const packageCost = async (req: Request, res: Response)=> {
         log("da5al 3 ")
         return
       }
-
+      
       const Name=resultsForName.rows[0].name
       const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       fs.writeFileSync(zipPath, content_as_base64);
