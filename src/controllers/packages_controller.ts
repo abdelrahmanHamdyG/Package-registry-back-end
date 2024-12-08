@@ -1,33 +1,32 @@
-import e, { Request, Response } from 'express';
+import  { Request, Response } from 'express';
 import http from "isomorphic-git/http/node/index.js";
 import * as git from 'isomorphic-git'
 import { promises as fss } from 'fs';
 import fs from 'fs'
 import jwt from 'jsonwebtoken';
-import os, { tmpdir, version } from "os"
-import path, { parse } from "path"
+import os from "os"
+import path from "path"
 import AdmZip from 'adm-zip' 
 import pool from '../db.js'; 
+import {log} from '../phase_1/logging.js'
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
-
-import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
-
-import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
+import { checkIfIamAdmin, debloat_file,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, printingTheCost, zipDirectory, encodeFileToBase64, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
+import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery, updateTokenQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageDependeciesByIDQuery, getPackageHistoryQuery ,getPackageNameByIDQuery,getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
-import {log} from '../phase_1/logging.js'
-
 import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 
+
+// function implementing the endpoint-->     (post) packges/
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
+
   const queries: Array<{ Name: string; Version?: string }> = req.body;
   const offset: number = parseInt(req.query.offset as string) || 0;
-  const packages: any[] = [];
   
   log('Request body for search packages queries', req.body);
   
-
+  // checking if the input is in the format
   if (
     !Array.isArray(queries) ||
     queries.some(
@@ -46,27 +45,45 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
     return;
   }
 
+
+
   const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
-  // Check if the user can search
+  
 
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     log(`Token is missing in searchPackage by queries`);
     return;
   }
-
-  let queryText = 'SELECT * FROM package';
-  const queryParams: (string | number)[] = [];
-  const conditions: string[] = [];
+  
+  
 
   try {
+
+    // checking token limit (1000) call 
+    const resultTokenQuerey = await updateTokenQuery(token);
+    const usageCount = resultTokenQuerey.rows[0].usage_count;
+
+    if(usageCount>1000){
+      res.status(403).json({
+        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+      });
+      return 
+    }
+
+
+    let queryText = 'SELECT * FROM package';
+    const queryParams: (string | number)[] = [];
+    const conditions: string[] = [];
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
 
     const isAdmin = await checkIfIamAdmin(req);
     const canISearchFlag = await canISearchQuery(userId);
 
+
+    // Check if the user can search
     if (canISearchFlag.rows.length === 0 && isAdmin !== 1) {
       res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
       log("token is missing in search packages by queries")
@@ -198,6 +215,8 @@ export const uploadPackage = async (req: Request, res: Response) => {
   let { Name,Content, JSProgram, debloat, URL } = req.body;
   let key = '';
   let id = 0;
+  let zipPath="."
+  let tempDir="repo"
 
   if ((!Content && !URL) || (Content && URL)) {
     res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
@@ -226,6 +245,17 @@ export const uploadPackage = async (req: Request, res: Response) => {
       return
     }
 
+  const result = await updateTokenQuery(token);
+  
+  const usageCount = result.rows[0].usage_count;
+
+  if(usageCount>1000){
+    res.status(403).json({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+    return
+  }
+
 
     if (Content) {
 
@@ -245,7 +275,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       // it is uploaded by content
       // reading the buffer writing it to the device 
       const content_as_base64=Buffer.from(Content,"base64")
-      const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
+      zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       fs.writeFileSync(zipPath, content_as_base64);
       const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
       const zip = new AdmZip(zipPath);
@@ -326,7 +356,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
       }
       log(`Package ${Name} is qualified`)
       
-      const tempDir = path.join(os.tmpdir(), `repo`);
+      tempDir = path.join(os.tmpdir(), `repo`);
       fs.mkdirSync(tempDir, { recursive: true });
       
 
@@ -415,7 +445,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         await debloat_file(tempDir)
       }
       
-      const zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
+      zipPath = path.join(os.tmpdir(), `repo-${id}.zip`);
       await zipDirectory(tempDir, zipPath);
       log(`Zipped repository to ${zipPath}`);
       const fileStream = fs.createReadStream(zipPath);
@@ -477,6 +507,18 @@ export const uploadPackage = async (req: Request, res: Response) => {
       
     await client.query('ROLLBACK');
 
+    try {
+      if (await fss.stat(tempDir).catch(() => false)) {
+        await fss.rm(tempDir, { recursive: true, force: true });
+      }
+    
+      if (await fss.stat(zipPath).catch(() => false)) {
+        await fss.rm(zipPath);
+      }
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    }      
+
     log(`Error in uploading package: ${Name} ${error}` );
     
     if (error  instanceof Error&& error.name === 'TokenExpiredError') {
@@ -496,9 +538,11 @@ export const uploadPackage = async (req: Request, res: Response) => {
 };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
+  console.log("req.header ",req.headers )
   log("we are getting package by id ")
   const idRead =req.params.id
 
+  
   const regex = /^[a-zA-Z0-9\-]+$/;
   if(!idRead || !regex.test(idRead)){
 
@@ -522,6 +566,17 @@ export const getPackageByID = async (req: Request, res: Response)=> {
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     log(`GettingPacakgeByID: Unauthorized: Token missing.`)
+    return
+  }
+  
+  const result = await updateTokenQuery(token);
+  
+  const usageCount = result.rows[0].usage_count;
+
+  if(usageCount>1000){
+    res.status(403).json({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
     return
   }
 
@@ -691,6 +746,7 @@ if (!token) {
 
 try {
 
+  
   const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
   const userId = decoded.sub;
   const isAdmin=await checkIfIamAdmin(req)
@@ -699,6 +755,17 @@ try {
     
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     return;
+  }
+
+  const result = await updateTokenQuery(token);
+  
+  const usageCount = result.rows[0].usage_count;
+
+  if(usageCount>1000){
+    res.status(403).json({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+    return
   }
 
 
@@ -839,7 +906,18 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
-    
+    const result = await updateTokenQuery(token);
+  
+    const usageCount = result.rows[0].usage_count;
+  
+    if(usageCount>1000){
+      res.status(403).json({
+        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+      });
+      return
+    }
+  
+  
 
     if(isAdmin==0){
 
@@ -1051,6 +1129,18 @@ export const updatePackage = async (req: Request, res: Response) => {
       log("Update:can I uploadFlag return null")
       return
     }    
+    const resultTokenQuerey = await updateTokenQuery(token);
+  
+    const usageCount = resultTokenQuerey.rows[0].usage_count;
+  
+    if(usageCount>1000){
+      res.status(403).json({
+        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+      });
+      return
+    }
+  
+  
     if(!canIUploadFlag.rows[0].can_upload){
         res.status(405).json({error:"you are not allowed update packages"})
         log("Update:not admin and can I upload flag =0")
@@ -1343,6 +1433,18 @@ export const packageCost = async (req: Request, res: Response)=> {
     const userId = decoded.sub;
     const isAdmin=await checkIfIamAdmin(req)
     log(`my user Id is ${userId}`)
+
+    const resultTokenQuerey = await updateTokenQuery(token);
+  
+    const usageCount = resultTokenQuerey.rows[0].usage_count;
+  
+    if(usageCount>1000){
+      res.status(403).json({
+        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+      });
+      return
+    }
+  
     // I should check first if he has permission of download or not and then check if this package is in group or not if not I can download if in my group I can also if not in my group I can't download
     const result=await canISearchQuery(userId)    
     if(result.rows.length==0&&isAdmin!=1){
@@ -1498,3 +1600,5 @@ log(JSON.stringify(transformedData, null, 2));
     client.release();
   }
 };
+
+

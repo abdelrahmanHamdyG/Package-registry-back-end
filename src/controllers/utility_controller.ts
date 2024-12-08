@@ -1,5 +1,5 @@
 // controller.ts
-import e, { Request, Response } from 'express';
+import e, { NextFunction, Request, Response } from 'express';
 import axios from 'axios';
 
 import fs from 'fs'
@@ -13,7 +13,11 @@ import archiver from "archiver";
 import pool from '../db.js'; 
 import {log} from '../phase_1/logging.js'
 import { PoolClient } from 'pg';
+import timeout from 'connect-timeout';
 import { insertPackageDependency } from '../queries/packages_queries.js';
+
+
+const TIMEOUT_DURATION = '600s'; 
 
 
 export const checkIfIamAdmin = async (req: Request)=>{
@@ -598,4 +602,7 @@ const markdownToText = async(markdown: string) => {
 
   return plainText.trim();
 };
+
+
+
 
