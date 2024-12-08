@@ -137,7 +137,7 @@ export const authenticate = async (req: Request, res: Response) => {
       // Send the token back to the user
       res.type("text/plain");
       
-      res.send(` Bearer ${token} `);
+      res.status(200).send(` Bearer ${token} `);
     } catch (err) {
       log(`Error during authentication:${err}` );
       res.status(500).json({ error: 'Internal server error.' });
@@ -189,6 +189,7 @@ export const getUserAccess=async (req:Request,res:Response)=>{
     return;
   }
 
+  
   const result =await getUserAccessQuery(user_id)
 
   if(result.rows.length==0){
@@ -276,66 +277,3 @@ export const updateUserAccess = async (req: Request, res: Response) => {
 };
 
 
-
-
-
-export const enforceTokenUsage = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const authHeader = req.headers['x-authorization'] as string;
-    const token = authHeader?.split(' ')[1]; // Extract token from "Bearer <token>"
-
-    if (!token) {
-      res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-      log('Access denied: Missing token');
-      return;
-    }
-
-    // Verify JWT token
-    let decoded: any;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-    } catch (err) {
-      res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-      log('Access denied: Invalid or expired token');
-      return;
-    }
-
-    // Optional: Attach user info to request object for downstream use
-    
-    // Atomically increment usage_count and retrieve the new count
-   
-    const result=await updateTokenQuery(token)
-
-    if(!result.rows.length){
-      res.status(403).json({
-        error: `Authentication failed due to invalid or missing AuthenticationToken.`,
-      });
-      log("token is deleted")
-      return
-    }
-
-    const usageCount = result.rows[0].usage_count;
-
-    if (usageCount > MAX_CALLS) {
-      // Exceeded the maximum allowed usage
-      // Optionally, delete the token from user_tokens table to invalidate it
-      await removeUserTokenQuery(token)
-      res.status(403).json({
-        error: `Authentication failed due to invalid or missing AuthenticationToken.`,
-      });
-      log(`Access denied: Token usage limit exceeded for token ${token}`);
-      return;
-    }
-
-    log(`Token usage incremented: ${usageCount}/${MAX_CALLS}`);
-
-    next(); // Proceed to the next middleware or route handler
-  } catch (error) {
-    console.error('Rate limiter error:', error);
-    res.status(500).json({ error: 'Internal server error.' });
-  }
-};
