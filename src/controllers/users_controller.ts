@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import e, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../db.js'; 
-import { checkIfIamAdmin } from './utility_controller.js';
+import { checkIfIamAdmin, removeEscapingBackslashes } from './utility_controller.js';
 import {  getAllUsersWithNameQuery, getUserAccessQuery, getUserWithUserNameQuery, insertToUserTokenQuery, insertUserToUsersQuery, removeUserTokenQuery, updateUserAccessQuery } from '../queries/users_queries.js';
 import { doesGroupExistQuery, insertUserToGroupQuery } from '../queries/groups_queries.js';
 import {log} from '../phase_1/logging.js'

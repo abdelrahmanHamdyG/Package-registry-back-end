@@ -1,7 +1,7 @@
 // queries.ts
 import { Client, Pool, PoolClient } from 'pg';
 import pool from '../db.js'; 
-import { get_current_date } from '../controllers/utility_controller.js';
+import { get_current_date, isFullMatchRegex, modifyRegexForSubstringMatch, sanitizeRegexRepetition } from '../controllers/utility_controller.js';
 
 
 // Get package by ID
@@ -116,11 +116,12 @@ export const insertIntoPackageDataQuery = (
   content:string,
   url:string,
   debloat:Boolean,
-  js_program:string
+  js_program:string,
+  readme:string|null
 ) => {
   const query = `
-    INSERT INTO package_data (package_id, content, url, debloat, js_program)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO package_data (package_id, content, url, debloat, js_program,readme)
+    VALUES ($1, $2, $3, $4, $5,$6)
     RETURNING *
   `;
   return client.query(query, [
@@ -129,6 +130,7 @@ export const insertIntoPackageDataQuery = (
     url,
     debloat,
     js_program,
+    readme
   ]);
 };
 
@@ -165,7 +167,7 @@ export const getPackageRatingQuery = (packageID: number) => {
 
 
 
-export const searchPackagesByRegExQuery = (client:PoolClient,regex: string,group_id:number) => {
+export const searchPackagesByRegExQuery = async(client:PoolClient,regex: string,group_id:number) => {
   const query = `
     SELECT id, name, version
     FROM package
@@ -175,17 +177,44 @@ export const searchPackagesByRegExQuery = (client:PoolClient,regex: string,group
         OR group_id = $2
       )
   `
-  return client.query(query, [regex,group_id]);
+  return await client.query(query, [regex,group_id]);
+};
+export const searchPackagesByRegExQueryForAdminQuery = async (client: PoolClient, regex: string): Promise<any> => {
+  try {
+    // Step 1: Sanitize the regex to cap large repetition counts
+    // const sanitizedRegex = sanitizeRegexRepetition(regex);
+
+    // // Step 2: Determine if it's a full match regex
+    // const fullMatch = isFullMatchRegex(sanitizedRegex);
+
+    // // Step 3: Modify the regex for substring matching if needed
+    // const modifiedRegex = modifyRegexForSubstringMatch(sanitizedRegex, fullMatch);
+
+    // // Log the modifications
+    // console.log(`Modified regex is ${modifiedRegex}`);
+    // if (regex !== modifiedRegex) {
+    //   console.warn(`Regex sanitized: ${regex} -> ${modifiedRegex}`);
+    // }
+
+    // Step 4: Execute the query with the modified regex
+    console.log(`regex is ${regex}`)
+    const query = `
+      SELECT p.id, p.name, p.version
+  FROM package p
+  LEFT JOIN package_data pd ON p.id = pd.package_id
+  WHERE p.name ~ $1
+    OR pd.readme ~ $1;
+
+    `;
+    return await client.query(query, [regex]);
+  } catch (error: any) {
+    if (error.message.includes('invalid regular expression')) {
+      throw new Error(`Invalid regex provided: ${regex}`);
+    }
+    throw error; // Rethrow other errors
+  }
 };
 
-export const searchPackagesByRegExQueryForAdminQuery  = (client:PoolClient,regex: string) => {
-  const query = `
-    SELECT id, name, version
-    FROM package
-    WHERE name ~* $1
-  `
-  return client.query(query, [regex]);
-};
 export const insertPackageRatingQuery  = (
   client:PoolClient,
   packageID: number,

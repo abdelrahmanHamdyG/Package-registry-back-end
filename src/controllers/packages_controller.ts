@@ -10,7 +10,9 @@ import AdmZip from 'adm-zip'
 import pool from '../db.js'; 
 import {processUrl} from '../phase_1/cli.js'
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
-import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, getURLFromPackageJson } from './utility_controller.js';
+
+import { checkIfIamAdmin, debloat_file, findPackageJson,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, isValidIdFormat, printingTheCost, zipDirectory, encodeFileToBase64, isFullMatchRegex, sanitizeRegexRepetition, extractReadmeAsync } from './utility_controller.js';
+
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery } from '../queries/users_queries.js';
 import { getUserGroupQuery } from '../queries/groups_queries.js';
 import { checkPackageExistsQuery, getLatestPackageQuery, getNameVersionByIdQuery, getPackageByIDQuery, getPackageDependeciesByIDQuery, getPackageHistoryQuery ,getPackageNameByIDQuery,getPackageRatingQuery, insertIntoPackageDataQuery, insertPackageQuery, insertPackageRatingQuery, insertToPackageHistoryQuery, insertToPackageHistoryRatingQuery, resetRegistryQuery, searchPackagesByRegExQuery, searchPackagesByRegExQueryForAdminQuery } from '../queries/packages_queries.js';
@@ -248,6 +250,10 @@ export const uploadPackage = async (req: Request, res: Response) => {
       const path_after_unzipping = path.join(os.tmpdir(), `package-${id}`);
       const zip = new AdmZip(zipPath);
       zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
+
+      const readmeContent=await extractReadmeAsync(path_after_unzipping)
+
+
       let obtainedurl=getURLFromPackageJson(path_after_unzipping)
       if (obtainedurl!='no url'){
         const metrics=await processUrl(obtainedurl)
@@ -270,17 +276,19 @@ export const uploadPackage = async (req: Request, res: Response) => {
       else{
         await insertPackageRatingQuery(client, id)
       }
+
       if (debloat) {
         await debloat_file(path_after_unzipping); // Use your debloat/minification function
         log(`we debloated the package ${Name} successfuly`)
       }
+
       const debloat_package_zipped_path=path.join(os.tmpdir(), `debloated-package-${id}.zip`);
       await zipDirectory(path_after_unzipping,debloat_package_zipped_path)
       const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
       const base64FinalContent = finalZipContent.toString('base64');
       await uploadBase64ToS3(base64FinalContent,  key);
       log(`we uploaded ${Name} to S3 `)
-      await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
+      await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
       log(`we inserted ${Name} to PackageData `)
       
       log(`we inserted ${Name} to Package Rating with default values as it is content`)
@@ -344,7 +352,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         log(`Cloned ${repoURL} successfully.`);
 
         // Get package information
-
+        
         log("we are starting to get the name from package json")
         const packageNameFromPackageJson  = await getNameFromPackageJson(tempDir);
         if (packageNameFromPackageJson =="no name"){
@@ -402,7 +410,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
         ?.License_Latency,metrics?.DependencyLatency,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
       );
       log(`we insert the rating of Package ${Name}`)
-
+      const readmeContent=await extractReadmeAsync(tempDir)
       if(debloat){
         await debloat_file(tempDir)
       }
@@ -422,7 +430,7 @@ export const uploadPackage = async (req: Request, res: Response) => {
 
 
       log("we get the zipped file succssfully")
-      await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
+      await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
       log(`we inserted ${URL} to PackageData Successfully `)
 
 
@@ -658,6 +666,7 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 
 
 export const searchPackageByRegex = async (req: Request, res: Response) => {
+  
 const { RegEx } = req.body;
 
 log(`Searching package by Regex with ${RegEx} called`)
@@ -686,19 +695,44 @@ try {
   const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
   const userId = decoded.sub;
   const isAdmin=await checkIfIamAdmin(req)
+
+  if(isAdmin==-1){
+    
+    res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
+    return;
+  }
+
+
   
   if(isAdmin!=1){
     const canISearchFlag=await canISearchQuery(userId)
   
     if (!canISearchFlag.rows[0].can_search){
       
-      res.status(405).json({"error":"sorry you don't have access to search with this regex "})
+      res.status(403).json({"error":"sorry you don't have access to search with this regex "})
       log(`sorry you don't have access to search about package as ${userId}`)
       return
     }
 
     const userGroupResult = await getUserGroupQuery(userId);
     const userGroupId = userGroupResult.rows.length > 0 ? userGroupResult.rows[0].group_id : null;
+
+    const sanitizedRegex = sanitizeRegexRepetition(RegEx);
+
+    // Automatically detect if the regex is for a full match
+    const fullMatch = isFullMatchRegex(sanitizedRegex);
+
+    // Modify the regex for full match if needed
+    const modifiedRegex = fullMatch ? sanitizedRegex : `.*${sanitizedRegex}.*`;
+
+    // Log if the regex was modified
+    console.log(`modified regex is ${modifiedRegex}`)
+    if (RegEx !== modifiedRegex) {
+      console.warn(`Regex sanitized: ${RegEx} -> ${modifiedRegex}`);
+    }
+
+    
+
     const packageMetaData = await searchPackagesByRegExQuery(client,RegEx,userGroupId);
 
     if(packageMetaData.rows.length===0){
@@ -730,6 +764,21 @@ try {
 
     // he is an admin
     log(`I am an admin`)
+    // const sanitizedRegex = sanitizeRegexRepetition(RegEx);
+
+    // // Automatically detect if the regex is for a full match
+    // const fullMatch = isFullMatchRegex(sanitizedRegex);
+
+    // // Modify the regex for full match if needed
+    // const modifiedRegex = fullMatch ? sanitizedRegex : sanitizedRegex.startsWith('.*') ? sanitizedRegex : `.*${sanitizedRegex}.*`;
+    
+    // // Log if the regex was modified
+    // console.log(`modified regex is ${modifiedRegex}`)
+    // if (RegEx !== modifiedRegex) {
+    //   console.warn(`Regex sanitized: ${RegEx} -> ${modifiedRegex}`);
+    // }
+
+    
     const packageMetaData = await searchPackagesByRegExQueryForAdminQuery(client,RegEx);
 
     if(packageMetaData.rows.length===0){
@@ -771,7 +820,8 @@ catch (error) {
     return;
   }
   log(`Error in searching by Regex: ${RegEx} ${error}` );
-  res.status(404).json({ error: 'Internal Server Error' });
+  res.status(400).json({error:"There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)"})
+  
 } finally {
   client.release();      
 }
@@ -860,8 +910,6 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
     res.status(500).json({ error: 'Internal server error' });
     return 
   }
-
-
 
 }
 
@@ -1098,6 +1146,9 @@ export const updatePackage = async (req: Request, res: Response) => {
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(path_after_unzipping, true); // Unzip to tempDir
         log("Update:Unzipped content to temporary directory.");
+
+        const readmeContent=await extractReadmeAsync(path_after_unzipping)
+
         let obtainedurl=getURLFromPackageJson(path_after_unzipping)
         if (obtainedurl!='no url'){
           const metrics=await processUrl(obtainedurl)
@@ -1118,6 +1169,7 @@ export const updatePackage = async (req: Request, res: Response) => {
         else {
           await insertPackageRatingQuery(client, id)
         }
+
         if (debloat) {
           await debloat_file(path_after_unzipping); // Use your debloat/minification function
           log("Update:Debloated package contents.");
@@ -1127,8 +1179,13 @@ export const updatePackage = async (req: Request, res: Response) => {
         const finalZipContent = fs.readFileSync(debloat_package_zipped_path);
         const base64FinalContent = finalZipContent.toString('base64');
         await uploadBase64ToS3(base64FinalContent,  key);    
-        await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
+
+        await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
+        await insertPackageRatingQuery(client,id);  
+
         
+        
+
         res.status(200).json({ 
           metadata:{
             Name:Name,
@@ -1236,6 +1293,7 @@ export const updatePackage = async (req: Request, res: Response) => {
           ?.License_Latency,metrics?.DependencyLatency,metrics?.CodeReviewLatency,metrics?.NetScore ,metrics?.NetScore_Latency
 
         );
+        const readmeContent=await extractReadmeAsync(tempDir)
         if(debloat){
           await debloat_file(tempDir)
         }
@@ -1247,7 +1305,7 @@ export const updatePackage = async (req: Request, res: Response) => {
         const zipFileContent = fs.readFileSync(zipPath);
         const base64Content = zipFileContent.toString('base64');
 
-        await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram);
+        await insertIntoPackageDataQuery(client, id, '', URL, debloat, JSProgram,readmeContent);
         res.status(200).json({  
           metadata:{
             Name:Name,
