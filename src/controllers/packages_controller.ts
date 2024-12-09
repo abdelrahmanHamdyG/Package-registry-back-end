@@ -18,7 +18,7 @@ import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 import {processUrl} from "../phase_1/cli.js"
 
 
-// searching for packages by queries
+// searching for packages by Queries
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
   // get the name and the version to search for the packages
   const queries: Array<{ Name: string; Version?: string }> = req.body;
