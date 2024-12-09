@@ -18,7 +18,7 @@ import { insertPackageDependency } from '../queries/packages_queries.js';
 
 
 
-
+// checking if a specif user is admin
 export const checkIfIamAdmin = async (req: Request)=>{
   const authHeader = req.headers['x-authorization'] as string;
   
@@ -55,7 +55,7 @@ export const checkIfIamAdmin = async (req: Request)=>{
 
 
 
-
+// extracting the code files only .ts ,.js from the repo
 export const get_code_files=(dir:string):string[]=>{
 
     let files:string[] = [];
@@ -79,7 +79,7 @@ export const get_code_files=(dir:string):string[]=>{
   }
 
 
-
+// debloating the repo 
 export const debloat_file=async (dir:string)=>{
 
   const unnecessaryFiles = ['README.md', 'tests', '.eslintrc', 'docs', 'examples', '.github'];
@@ -103,7 +103,7 @@ export const debloat_file=async (dir:string)=>{
   }
 }
 
-
+// getting the dependencies of a repo 
 export const get_npm_adjacency_list = async (
   packageName: string,
   adj_list: Map<string, { strings: Set<string>; num: number }>
@@ -152,6 +152,8 @@ export const get_npm_adjacency_list = async (
   }
 };
 
+
+// get the name of an npm package
 export const get_npm_package_name=(path:string):string=>{
 
     let path_as_parts=path.split('/')
@@ -362,7 +364,7 @@ export const isValidIdFormat = (input: string): boolean => {
 
 
 
-
+// get the dependencies from package json
 export const getPackagesFromPackageJson = (dir: string): string[] => {
   const packagesList: string[] = [];
   const packageJsonPath = getPackageJson(dir);
@@ -453,7 +455,7 @@ export const getURLFromPackageJson=(dir: string): string=> {
   return packageURL;
 }
 
-
+// used to get packge json path of a repo
 const getPackageJson=(dir: string): string | null=> {
   const files = fs.readdirSync(dir); // Read files in the current directory
 
@@ -486,6 +488,7 @@ const getPackageJson=(dir: string): string | null=> {
 }
 
 
+// used to download the upload in base64
 export async function encodeFileToBase64(filePath:string) {
   try {
     const zipFileContent = await fss.readFile(filePath);
@@ -499,11 +502,13 @@ export async function encodeFileToBase64(filePath:string) {
 
 
 
+
 export function removeEscapingBackslashes(password:string) {
   return password.replace(/\\(.)/g, '$1');
 }
 
 
+// used to get the path of readme in the package
 export const extractReadmeAsync = async (extractedPath: string): Promise<string | null> => {
   try {
     const files = await fss.readdir(extractedPath); // Read files in the extracted directory
@@ -532,6 +537,7 @@ export const extractReadmeAsync = async (extractedPath: string): Promise<string 
 };
 
 
+// used to convert readme to txt
 const markdownToText = async(markdown: string) => {
   // Convert Markdown to HTML
   const htmlContent = await marked(markdown);

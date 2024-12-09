@@ -538,6 +538,8 @@ export const uploadPackage = async (req: Request, res: Response) => {
     }
   };
 
+
+//getting package by id 
 export const getPackageByID = async (req: Request, res: Response)=> {
   
   
@@ -720,6 +722,8 @@ export const getPackageByID = async (req: Request, res: Response)=> {
 };
 
 
+
+// searching by regex 
 export const searchPackageByRegex = async (req: Request, res: Response) => {
   
 const { RegEx } = req.body;
@@ -870,7 +874,7 @@ catch (error) {
 };
 
 
-
+// getting package history (track)
 export const getPackageHistory=async(req:Request,res:Response)=>{
 
 
@@ -966,6 +970,8 @@ export const getPackageHistory=async(req:Request,res:Response)=>{
 
 }
 
+
+// getting package rating 
 export const getPackageRating=async (req:Request,res:Response)=>{ 
 
   const packageIdRead = req.params.id 
@@ -1094,6 +1100,7 @@ export const getPackageRating=async (req:Request,res:Response)=>{
 
 
 
+// updating the package
 export const updatePackage = async (req: Request, res: Response) => {
   const packageId:number = req.params.id as unknown as number;  // Extracting the path parameter
 
@@ -1413,6 +1420,7 @@ export const updatePackage = async (req: Request, res: Response) => {
 };
 
 
+// calculating the cost 
 export const packageCost = async (req: Request, res: Response)=> {
   let adj_list = new Map<string, { strings: Set<string>; num: number }>();
   const id =Number(req.params.id)

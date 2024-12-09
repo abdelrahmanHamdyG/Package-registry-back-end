@@ -10,7 +10,7 @@ import {log} from '../phase_1/logging.js'
 
 
 
-
+// regitering the user only admin is allowed to do so 
 export const registerNewUser = async (req: Request, res: Response) => {
   
     const { name, password, isAdmin, groupId,canDownload=false,canSearch=false,canUpload=false } = req.body;
@@ -89,6 +89,8 @@ export const registerNewUser = async (req: Request, res: Response) => {
   };
   
   
+
+// authenticating to retrieve toke
 export const authenticate = async (req: Request, res: Response) => {
     const { User, Secret } = req.body;
     log(`we start authenticating with User ${User} and Secret: ${Secret}`)
@@ -146,7 +148,7 @@ export const authenticate = async (req: Request, res: Response) => {
     }
   };  
   
-
+// logging out
 export const logout = async (req: Request, res: Response) => {
   
     try {  
@@ -158,7 +160,7 @@ export const logout = async (req: Request, res: Response) => {
 };
 
 
-
+// get user access only admin is allowed to do so 
 export const getUserAccess=async (req:Request,res:Response)=>{
   const user_id=parseInt(req.params.user_id,10)
   if (!user_id) {
@@ -211,7 +213,7 @@ export const getUserAccess=async (req:Request,res:Response)=>{
 
 }
 
-
+// update user access only admin is allowed to do so 
 export const updateUserAccess = async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.user_id, 10);
 
