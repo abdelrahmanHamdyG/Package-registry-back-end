@@ -17,7 +17,6 @@ import timeout from 'connect-timeout';
 import { insertPackageDependency } from '../queries/packages_queries.js';
 
 
-const TIMEOUT_DURATION = '600s'; 
 
 
 export const checkIfIamAdmin = async (req: Request)=>{
@@ -160,8 +159,6 @@ export const get_npm_package_name=(path:string):string=>{
 
 }
 
-let cost = new Map<string, number>();
-
 export const calculate_cost = (
   package_name: string,
   adj_list: Map<string, { strings: Set<string>; num: number }>,
@@ -201,26 +198,6 @@ export const calculate_cost = (
   visited.delete(package_name); // Remove from visited after processing
 };
 
-
-
-export const fetch_package_size = async (packageName: string): Promise<number> => {
-    const url = `https://registry.npmjs.org/${packageName}`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Could not fetch data for package: ${packageName}`);
-        }
-
-        const data = await response.json();
-        const latestVersion = data['dist-tags'].latest;
-        const size = data.versions[latestVersion].dist.unpackedSize;
-
-        return size; // Size in bytes
-    } catch (error) {
-        log(`Error fetching size for ${packageName}:${error}` );
-        return 0; // Return 0 if there's an error
-    }
-};
 
 export const printingTheCost = async (
   package_id:Number,
