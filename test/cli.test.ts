@@ -18,7 +18,6 @@ vi.mock('../src/phase_1/cli', async (original) => {
 });
 
 // Import runWorker after mocking
-import { runWorker } from '../src/phase_1/cli';
 
 afterEach(() => {
   vi.clearAllMocks();

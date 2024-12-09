@@ -1,17 +1,16 @@
 import { describe, it, expect,beforeEach,afterEach } from 'vitest';
 import { query, Request, Response } from 'express';
 import { vi } from 'vitest';
-import bcrypt from 'bcrypt';
+
 import pool from '../src/db.js';
 import jwt from 'jsonwebtoken';
 import { checkIfIamAdmin} from '../src/controllers/utility_controller';
 
-import {canISearchQuery,canIReadQuery,canIUploadQuery,canUserAccessPackageQuery,updateTokenQuery} from '../src/queries/users_queries';
+import {canISearchQuery,canIReadQuery,canUserAccessPackageQuery,updateTokenQuery} from '../src/queries/users_queries';
 import {getUserGroupQuery} from '../src/queries/groups_queries'
-import {searchPackagesByQueries,resetRegistry,getPackageByID,searchPackageByRegex,getPackageHistory,getPackageRating,uploadPackage} from '../src/controllers/packages_controller'
-import { resetRegistryQuery,getPackageByIDQuery,insertToPackageHistoryQuery,searchPackagesByRegExQuery,searchPackagesByRegExQueryForAdminQuery,getPackageHistoryQuery,getPackageRatingQuery, checkPackageExistsQuery,insertToPackageHistoryRatingQuery} from '../src/queries/packages_queries.js';
+import {searchPackagesByQueries,resetRegistry,getPackageByID,searchPackageByRegex,getPackageHistory,getPackageRating} from '../src/controllers/packages_controller'
+import { resetRegistryQuery,getPackageByIDQuery,searchPackagesByRegExQuery,searchPackagesByRegExQueryForAdminQuery,getPackageHistoryQuery,getPackageRatingQuery, checkPackageExistsQuery,insertToPackageHistoryRatingQuery} from '../src/queries/packages_queries.js';
 import { downloadFromS3 } from '../src/s3.js';
-import { processUrl } from '../src/phase_1/cli.js';
 
 
  
@@ -251,282 +250,326 @@ describe("resetRegistry",()=>{
 })
 
 
+describe("getPackageById", () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
 
+  beforeEach(() => {
+    req = {
+      params: { id: "45" },
+      headers: { 'x-authorization': 'Bearer fakeToken' },
+    };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+  });
 
-describe("getPackageById",()=>{
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-    let req: Partial<Request>;
-    let res: Partial<Response>;
+  it('should return 200 with package metadata and content if all checks pass', async () => {
+    const fakeZipContent = Buffer.from('fakeContent', 'utf8');
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(true);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
+    (getPackageByIDQuery as vi.Mock).mockResolvedValue({
+      rows: [{ id: 1, name: 'testPackage', version: '1.0.0', group_id: null, js_program: null, debloat: null, url: null }],
+    });
+    (downloadFromS3 as vi.Mock).mockResolvedValue(fakeZipContent);
+
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      metadata: {
+        Name: 'testPackage',
+        Version: '1.0.0',
+        ID: 1,
+      },
+      data: {
+        Content: fakeZipContent.toString('base64'),
+        JSProgram: null,
+        debloat: null,
+        URL: null,
+      },
+    });
+  });
+
+  it('should return 400 if id is missing or improperly formed', async () => {
+    if (req.params) req.params.id = '';
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'There is missing field(s) in the PackageID or it is formed improperly, or is invalid.',
+    });
+  });
+
+  it('should return 404 if id is NaN', async () => {
+    if (req.params) req.params.id = 'abc'; // Not numeric
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Package does not exist.' });
+  });
+
+  it('should return 403 if authentication token is missing', async () => {
+    if (req.headers) req.headers['x-authorization'] = '';
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
+  it('should return 403 if usage_count > 1000', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 1001 }] });
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
+  it('should return 403 if isAdmin = -1', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(-1);
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
+  it('should return 405 if user does not have permission to download and is not admin', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: false }] });
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "sorry you don't have access to download this package ",
+    });
+  });
+
+  it('should return 500 if canIReadQuery returns empty rows and isAdmin != 1', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [] });
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Internal Server erorr",
+    });
+  });
+
   
-    beforeEach(() => {
-      req = {
-        params: { id: "45" },
-        headers: { 'x-authorization': 'Bearer fakeToken' },
-      };
-      res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
+  it('should return 404 if package does not exist', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
+    (getPackageByIDQuery as vi.Mock).mockResolvedValue({ rows: [] });
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: "Package doesn't exist" });
+  });
+
+  it('should return 405 if package is restricted and user is in a different group', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
+    (getPackageByIDQuery as vi.Mock).mockResolvedValue({
+      rows: [{ id: 1, name: 'testPackage', group_id: 123, js_program: null, debloat: null, url: null }],
     });
+    (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 456 }] });
+
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "sorry you don't have access to download this package ",
+    });
+  });
+
+  it('should return 403 if token is expired', async () => {
+    (jwt.verify as vi.Mock).mockImplementation(() => {
+      throw new Error('TokenExpiredError');
+    });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Token has expired.',
+    });
+  });
+
+  it('should return 500 on unknown errors', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(true);
+    (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
+    (getPackageByIDQuery as vi.Mock).mockImplementation(() => { throw new Error('Unknown error'); });
+
+    await getPackageByID(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
+  });
+
+});
+
+
+describe("searchPackageByRegex", () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+
+  beforeEach(() => {
+    req = {
+      body: { RegEx: '^package.*' },
+      headers: { 'x-authorization': 'Bearer fakeToken' },
+    };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return 200 and metadata if an admin searches successfully', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({
+      rows: [
+        { id: 1, name: 'package1', version: '1.0.0' },
+        { id: 2, name: 'package2', version: '2.0.0' },
+      ],
+    });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([
+      { Name: 'package1', Version: '1.0.0', ID: 1 },
+      { Name: 'package2', Version: '2.0.0', ID: 2 },
+    ]);
+  });
+
+  it('should return 200 and metadata if a regular user searches successfully', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
+    (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
+    (searchPackagesByRegExQuery as vi.Mock).mockResolvedValue({
+      rows: [{ id: 3, name: 'package3', version: '3.0.0' }],
+    });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([
+      { Name: 'package3', Version: '3.0.0', ID: 3 },
+    ]);
+  });
+
+  it('should return 403 if the token is missing', async () => {
+    req.headers = {};
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
+  it('should return 403 if the user is not allowed to search', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
+    (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "sorry you don't have access to search with this regex ",
+    });
+  });
+
+  it('should return 404 if no packages match the regex', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({ rows: [] });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'No package found under this regex ',
+    });
+  });
+
+  it('should return 400 if RegEx is missing', async () => {
+    req.body = {};
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'There is missing field(s) in the PackageRegEx or it is formed improperly, or is invalid',
+    });
+  });
+
+  it('should return 403 if usage_count > 1000', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 1001 }] });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
+  it('should return 403 if isAdmin = -1', async () => {
+    (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+    (checkIfIamAdmin as vi.Mock).mockResolvedValue(-1);
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.',
+    });
+  });
+
   
-    afterEach(() => {
-      vi.clearAllMocks();
+  it('should return 400 if any other unexpected error occurs', async () => {
+    (jwt.verify as vi.Mock).mockImplementation(() => { throw new Error('Unexpected Error'); });
+
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)"
+    });
+  });
+
+  it('should return 403 if token expired', async () => {
+    (jwt.verify as vi.Mock).mockImplementation(() => {
+      const err = new Error('TokenExpiredError');
+      (err as any).name = 'TokenExpiredError';
+      throw err;
     });
 
-
-    it('should return 200 with package metadata and content if all checks pass', async () => {
-        const fakeZipContent = Buffer.from('fakeContent', 'utf8');
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(true);
-        (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
-        (getPackageByIDQuery as vi.Mock).mockResolvedValue({
-          rows: [{ id: 1, name: 'testPackage', group_id: null, js_program: null, debloat: null, url: null }],
-        });
-        (downloadFromS3 as vi.Mock).mockResolvedValue(fakeZipContent);
-        
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({
-          metadata: {
-            Name: 'testPackage',
-            Version: undefined,
-            ID: 1,
-          },
-          data: {
-            Content: fakeZipContent.toString('base64'),
-            JSProgram: null,
-            debloat: null,
-            URL: null,
-          },
-        });
-    })
-    
-    it('should return 400 if id is missing or improperly formed', async () => {
-        if(req.params)
-            req.params.id = '';
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'There is missing field(s) in the PackageID or it is formed improperly, or is invalid.',
-        });
-      });
-    
-    
-    it('should return 403 if authentication token is missing', async () => {
-        if(req.headers)
-        req.headers['x-authorization'] = '';
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-            error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-        });
+    await searchPackageByRegex(req as Request, res as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Authentication failed due to invalid or missing AuthenticationToken.'
     });
-
-
-    it('should return 403 if token is invalid or expired', async () => {
-        (jwt.verify as vi.Mock).mockImplementation(() => {
-          throw new Error('TokenExpiredError');
-        });
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'Token has expired.',
-        });
-    });
-    
-
-    it('should return 405 if user does not have permission to download', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
-        (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: false }] });
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(405);
-        expect(res.json).toHaveBeenCalledWith({
-          error: "sorry you don't have access to download this package ",
-        });
-      });
-    
-
-    it('should return 404 if package does not exist', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
-        (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
-        (getPackageByIDQuery as vi.Mock).mockResolvedValue({ rows: [] });
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.json).toHaveBeenCalledWith({ error: "Package doesn't exist" });
-      });
-    
-    
-    it('should return 405 if package is in a restricted group and user does not belong to that group', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
-        (getPackageByIDQuery as vi.Mock).mockResolvedValue({
-          rows: [{ id: 1, name: 'testPackage', group_id: 123 }],
-        });
-        (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 456 }] });
-        await getPackageByID(req as Request, res as Response);
-        expect(res.status).toHaveBeenCalledWith(405);
-        expect(res.json).toHaveBeenCalledWith({
-          error: "sorry you don't have access to download this package ",
-        });
-      });
-    
-    
-
-      
-
-
-
-})
-
-
-
-describe("searchPackageByRegex",()=>{
-
-    let req: Partial<Request>;
-    let res: Partial<Response>;
-  
-    beforeEach(() => {
-      req = {
-        body: { RegEx: '^package.*' },
-        headers: { 'x-authorization': 'Bearer fakeToken' },
-      };
-      res = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
-    });
-  
-    afterEach(() => {
-      vi.clearAllMocks();
-    });
-  
-
-    it('should return 200 and metadata if an admin searches successfully', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({
-          rows: [
-            { id: 1, name: 'package1', version: '1.0.0' },
-            { id: 2, name: 'package2', version: '2.0.0' },
-          ],
-        });
-    
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith([
-          {
-             Name: 'package1', Version: '1.0.0', ID: 1 
-          },
-          {
-            Name: 'package2', Version: '2.0.0', ID: 2
-          },
-        ]);
-      });
-    
-    it('should return 200 and metadata if a regular user searches successfully', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
-        (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
-        (searchPackagesByRegExQuery as vi.Mock).mockResolvedValue({
-          rows: [
-            { id: 3, name: 'package3', version: '3.0.0' },
-          ],
-        });
-    
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith([
-            {
-              Name: 'package3', Version: '3.0.0', ID: 3
-            },
-        ]);
-        
-        });
-
-    it('should return 403 if the token is missing', async () => {
-        req.headers = {};
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-        });
-      });
-    
-    it('should return 403 if the user is not allowed to search', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
-        (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
-    
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'sorry you don\'t have access to search with this regex ',
-        });
-      });
-
-    it('should return 404 if no packages match the regex', async () => {
-        (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
-        (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
-        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
-
-        (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({
-          rows: [],
-        });
-    
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'No package found under this regex ',
-        });
-      });
-
-    it('should return 400 if an error occurs during execution', async () => {
-        (jwt.verify as vi.Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
-    
-        await searchPackageByRegex(req as Request, res as Response);
-    
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)',
-        });
-      });
-    
-    
-
-})
+  });
+});
 
 
 

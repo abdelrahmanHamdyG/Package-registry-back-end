@@ -1,6 +1,6 @@
 
 import jwt from 'jsonwebtoken';
-import e, { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../db.js'; 
 import { checkIfIamAdmin, removeEscapingBackslashes } from './utility_controller.js';
@@ -10,7 +10,7 @@ import {log} from '../phase_1/logging.js'
 
 
 
-const MAX_CALLS=1000
+
 export const registerNewUser = async (req: Request, res: Response) => {
   
     const { name, password, isAdmin, groupId,canDownload=false,canSearch=false,canUpload=false } = req.body;
@@ -98,7 +98,7 @@ export const authenticate = async (req: Request, res: Response) => {
       log(`missing user name or password`)
       return;
     }
-    console.log("we are here")
+    
     const new_password=removeEscapingBackslashes(Secret.password)
     log(`password is ${new_password} instead of ${Secret.password}`)
     try {
@@ -109,7 +109,7 @@ export const authenticate = async (req: Request, res: Response) => {
         return;
       }
       
-      console.log("we are heree")
+      
       const user = result.rows[0];
   
       // Verify the password

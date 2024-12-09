@@ -6,15 +6,21 @@ import { doesUserExistQuery } from '../queries/users_queries.js';
 import { checkPackageExistsQuery } from '../queries/packages_queries.js';
 import {log} from '../phase_1/logging.js'
 
+
+// creating group can only be accessed by admin 
 export const createGroup=async(req:Request,res:Response)=>{
 
     const {name}=req.body;
-  
+
+
+    
     if(!name){
       res.status(401).json({error:"missing name"})
       return
     }
 
+
+    // checking if the user is admin
     const isAdmin=await checkIfIamAdmin(req)
     if(isAdmin==-1){
       res.status(402).json("token is missing or expired")
@@ -26,7 +32,7 @@ export const createGroup=async(req:Request,res:Response)=>{
       return
     }
 
-  
+    // fetch the group to check if it already exists before 
     const results=await getAllGroupsWithNameQuery(name)
   
     if(results.rows.length>0){
@@ -36,6 +42,8 @@ export const createGroup=async(req:Request,res:Response)=>{
     }
   
     try{
+
+      // inserting the group to the database
       const group=await insertToGroupsQuery(name)
       log(`we inserted group ${name} with id ${group.rows[0].id}`)
       res.status(202).json({id:group.rows[0].id})  
@@ -47,6 +55,8 @@ export const createGroup=async(req:Request,res:Response)=>{
 }
   
   
+
+// assign user to group, every user can be obly assigned to 0 or 1 group and can only be assigned by the admin 
 export const assignUserToGroup=async(req:Request,res:Response)=>{
   
     const groupId=parseInt(req.params.groupid,10)
@@ -60,7 +70,6 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
     }
   
     try {
-      // Check if the group exists
       const isAdmin=await checkIfIamAdmin(req)
 
       if (isAdmin==-1) {
@@ -74,6 +83,8 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
           return
       }
 
+
+      // Check if the group exists
       const groupExists = await doesGroupExistQuery(groupId);
       if (!groupExists) {
         
@@ -112,6 +123,8 @@ export const assignUserToGroup=async(req:Request,res:Response)=>{
 };
   
 
+
+// view all groups, can only accessed by admins 
 export const getAllGroups = async (req: Request, res: Response) => {
 
     log("Getting all groups available...");
@@ -124,7 +137,9 @@ export const getAllGroups = async (req: Request, res: Response) => {
       log("Token missing or invalid");
       return;
     }
-  
+    
+
+    // checking if I am the admin
     if (!amIAdmin) {
 
       res.status(403).json({ error: "Forbidden: Only admins can view all groups" });
@@ -145,7 +160,9 @@ export const getAllGroups = async (req: Request, res: Response) => {
 };
   
   
-  
+
+
+// get users assigned to a specific group 
 export const getUsersByGroup=async(req:Request,res:Response)=>{
   
     log("we are getting user by groups ")
@@ -190,6 +207,8 @@ export const getUsersByGroup=async(req:Request,res:Response)=>{
   
   
 
+
+// assign a specific package to group only users with the same group as the package can interact with the package
 export const assignPackageToGroup=async(req:Request,res:Response)=>{
   
 
@@ -231,6 +250,7 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
           return
       }
 
+      //checking if the group and the package already exists
       const checkGroupExistsFlag=await checkGroupExistsQuery(groupId)
       const checkPackageExistsFlag=await checkPackageExistsQuery(package_id)
       if(!checkGroupExistsFlag.rows.length||!checkPackageExistsFlag.rows.length){
@@ -241,6 +261,8 @@ export const assignPackageToGroup=async(req:Request,res:Response)=>{
 
       }
 
+
+      // assigning the package to the group
       await assignPackageGroupQuery(package_id,groupId)
       res.status(200).json({ message: "Package successfully assigned to group" });
       log(`Package ${package_id} successfully assigned to ${groupId}`)

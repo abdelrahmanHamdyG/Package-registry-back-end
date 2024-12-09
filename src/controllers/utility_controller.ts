@@ -143,12 +143,12 @@ export const get_npm_adjacency_list = async (
         try {
           await get_npm_adjacency_list(normalizedDependency, adj_list);
         } catch (error) {
-          console.error(`Error processing dependency ${normalizedDependency}:`, error);
+          log(`Error processing dependency ${normalizedDependency}: ${ error}`,);
         }
       }
     }
   } catch (error) {
-    console.error(`Error processing package ${packageName}:`, error);
+    log(`Error processing package ${packageName}: ${error}`);
   }
 };
 
@@ -171,7 +171,7 @@ export const calculate_cost = (
 
   const packageData = adj_list.get(package_name);
   if (!packageData) {
-    console.warn(`Package ${package_name} not found in adj_list`);
+    log(`Package ${package_name} not found in adj_list`);
     return; // Skip missing packages
   }
 
@@ -179,7 +179,7 @@ export const calculate_cost = (
   let totalCost = standaloneCost;
 
   if (visited.has(package_name)) {
-    console.warn(`Circular dependency detected: Skipping ${package_name}`);
+    log(`Circular dependency detected: Skipping ${package_name}`);
     return; // Skip circular dependencies
   }
 
@@ -187,7 +187,7 @@ export const calculate_cost = (
 
   for (const dep of packageData.strings) {
     if (!adj_list.has(dep)) {
-      console.warn(`Dependency ${dep} not found for package: ${package_name}`);
+      log(`Dependency ${dep} not found for package: ${package_name}`);
       continue; // Skip missing dependencies
     }
     calculate_cost(dep, adj_list, cost, visited);
@@ -220,7 +220,7 @@ export const printingTheCost = async (
       await insertPackageDependency(client, package_id, pack, standaloneCost, totalCost);
       log(`${pack} - Standalone Cost: ${standaloneCost}, Total Cost: ${totalCost}`);
     } catch (error) {
-      console.error(`Error inserting dependency for ${pack}:, error`);
+      log(`Error inserting dependency for ${pack}:, ${error}`);
     }
   }
 };
@@ -377,10 +377,10 @@ export const getPackagesFromPackageJson = (dir: string): string[] => {
       }
 
     } else {
-      console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+      log(`No 'package.json' found at path: ${packageJsonPath}`);
     }
   } else {
-    console.error(`error`);
+    log(`error`);
   }
 
   return packagesList;
@@ -403,14 +403,14 @@ export const getNameFromPackageJson=(dir: string): string=> {
         }
         else {
           packageName="no name"
-          console.error('There is no name in package.json so we will use the name of the github repo or the name of the npm package');
+          log('There is no name in package.json so we will use the name of the github repo or the name of the npm package');
         }
     } else {
-        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+        log(`No 'package.json' found at path: ${packageJsonPath}`);
     }
   }
   else {
-    console.error(`error`)
+    log(`error`)
   }
   log(`the returned name is ${packageName}`)
   return packageName;
@@ -436,18 +436,18 @@ export const getURLFromPackageJson=(dir: string): string=> {
             .replace(/^git:\/\//, 'https://')  // Replace 'git://' with 'https://'
             .replace(/\.git$/, '') 
             .replace(/^git\+/, "");      // Remove the '.git' at the end
-          console.log(`You can view the repository at: ${packageURL}`);
+          log(`You can view the repository at: ${packageURL}`);
         }
         else {
           packageURL="no url"
-          console.error('There is no url in package.json');
+          log('There is no url in package.json');
         }
     } else {
-        console.error(`No 'package.json' found at path: ${packageJsonPath}`);
+        log(`No 'package.json' found at path: ${packageJsonPath}`);
     }
   }
   else {
-    console.error(`error`)
+    log(`error`)
   }
   log(`the returned url is ${packageURL}`)
   return packageURL;
@@ -491,7 +491,7 @@ export async function encodeFileToBase64(filePath:string) {
     const zipFileContent = await fss.readFile(filePath);
     return zipFileContent.toString('base64'); // Return the Base64 string
   } catch (error) {
-    console.error('Error reading or encoding file:', error);
+    log(`Error reading or encoding file: ${error}` );
     throw error;
   }
 }
@@ -526,7 +526,7 @@ export const extractReadmeAsync = async (extractedPath: string): Promise<string 
     log(`No README file found in extracted package`);
     return null;
   } catch (error) {
-    console.error(`Error processing README: ${error}`);
+    log(`Error processing README: ${error}`);
     return null;
   }
 };

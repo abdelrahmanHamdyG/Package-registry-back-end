@@ -9,7 +9,6 @@ import path from "path"
 import AdmZip from 'adm-zip' 
 import pool from '../db.js'; 
 import {log} from '../phase_1/logging.js'
-
 import { downloadFromS3, uploadBase64ToS3, uploadZipToS3 } from '../s3.js';
 import { checkIfIamAdmin, debloat_file,getNameFromPackageJson,get_npm_package_name, get_repo_url, getGitHubRepoNameFromUrl, getPackagesFromPackageJson, printingTheCost, zipDirectory, encodeFileToBase64, extractReadmeAsync, getURLFromPackageJson } from './utility_controller.js';
 import { canIReadQuery, canISearchQuery, canIUploadQuery, canUserAccessPackageQuery, updateTokenQuery } from '../queries/users_queries.js';
@@ -19,9 +18,9 @@ import {get_npm_adjacency_list} from "../controllers/utility_controller.js"
 import {processUrl} from "../phase_1/cli.js"
 
 
-// function implementing the endpoint-->     (post) packges/
+// searching for packages by queries
 export const searchPackagesByQueries = async (req: Request, res: Response): Promise<void> => {
-
+  // get the name and the version to search for the packages
   const queries: Array<{ Name: string; Version?: string }> = req.body;
   const offset: number = parseInt(req.query.offset as string) || 0;
   
@@ -42,16 +41,18 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       error:
         'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
     });
+    // if the name is missing or the version is undefined  
     log('Invalid or missing fields in PackageQuery');
     return;
   }
 
 
-
+//get the token from the header x-authorization
   const authHeader = req.headers['x-authorization'] as string;
   const token = authHeader && authHeader.split(' ')[1];
   
 
+  // if the header is empty
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
     log(`Token is missing in searchPackage by queries`);
@@ -61,26 +62,24 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
   
 
   try {
-
     // checking token limit (1000) call 
     const resultTokenQuerey = await updateTokenQuery(token);
     const usageCount = resultTokenQuerey.rows[0].usage_count;
-
     if(usageCount>1000){
       res.status(403).json({
         error: 'Authentication failed due to invalid or missing AuthenticationToken.',
       });
       return 
     }
-
-
+    // the start of the query
     let queryText = 'SELECT * FROM package';
     const queryParams: (string | number)[] = [];
     const conditions: string[] = [];
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as { sub: number };
     const userId = decoded.sub;
-
+    // get if the user is the admin
     const isAdmin = await checkIfIamAdmin(req);
+    //get if the user can search 
     const canISearchFlag = await canISearchQuery(userId);
 
 
@@ -96,7 +95,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
       log("user is not allowed to search packages by queries")
       return;
     }
-
+    // iteration to make add to the query 
     for (let i = 0; i < queries.length; i++) {
       const { Name, Version } = queries[i];
 
@@ -178,7 +177,7 @@ export const searchPackagesByQueries = async (req: Request, res: Response): Prom
 };
 
   
-  
+// reseting the the registery, only the admin is allowed to reset
 export const resetRegistry = async (req: Request, res: Response) => {
 
     const isAdmin=await checkIfIamAdmin(req);
@@ -210,8 +209,8 @@ export const resetRegistry = async (req: Request, res: Response) => {
 };
   
   
-    
-  export const uploadPackage = async (req: Request, res: Response) => {
+// uploading the package  
+export const uploadPackage = async (req: Request, res: Response) => {
 
     let { Name,Content, JSProgram, debloat, URL } = req.body;
     let key = '';
@@ -267,7 +266,7 @@ export const resetRegistry = async (req: Request, res: Response) => {
           log(`uploading package ${Name} is with id:${id}`)
         }
         else{
-          console.error("name is undefined")
+          
           res.status(440).json({ error: 'Name is undefined' });
           return
         }
@@ -483,7 +482,8 @@ export const resetRegistry = async (req: Request, res: Response) => {
             await fss.rm(zipPath);
           }
         } catch (error) {
-          console.error('Error during cleanup:', error);
+          log(`error removing directories ${error}`)
+
         }      
 
         log(`we removed the directories we used succesfully`)
@@ -517,7 +517,7 @@ export const resetRegistry = async (req: Request, res: Response) => {
           await fss.rm(zipPath);
         }
       } catch (error) {
-        console.error('Error during cleanup:', error);
+        
       }      
 
       log(`Error in uploading package: ${Name} ${error}` );
@@ -539,7 +539,7 @@ export const resetRegistry = async (req: Request, res: Response) => {
   };
 
 export const getPackageByID = async (req: Request, res: Response)=> {
-  console.log("req.header ",req.body )
+  
   
   const idRead =req.params.id
   log(`we are getting package by id ${idRead}`)
@@ -1185,7 +1185,7 @@ export const updatePackage = async (req: Request, res: Response) => {
     if ((!Content && !URL) || (Content && URL) ||!Version ) {
       log(`Update:Name is ${Name} returned name is ${returnedName}`)
       res.status(400).json({ error: "There is a missing field(s) in the PackageData or it is improperly formed (e.g., Content and URL are both set)" });
-      console.error("Error: Invalid format of Content and URL");
+      
       return;
     }
     if(result==-1){
@@ -1426,7 +1426,7 @@ export const packageCost = async (req: Request, res: Response)=> {
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    console.error(`Unauthorized: Token missing.`)
+    
     return
   }
   try {  
@@ -1450,14 +1450,14 @@ export const packageCost = async (req: Request, res: Response)=> {
     const result=await canISearchQuery(userId)    
     if(result.rows.length==0&&isAdmin!=1){
       res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
-      console.error(`no thing returned from the table for user ${userId}`)
+      
       return
     }
     const canIReadBool=result.rows[0]
     log(canIReadBool)
     if(!canIReadBool.can_search&&isAdmin!=1){
       res.status(400).json({"error":"sorry you don't have access to download this package "})
-      console.error(`sorry you don't have access to download this package as ${userId}`)
+      
       return
     }
     log(`User ${userId} can download packages `)
@@ -1511,7 +1511,7 @@ export const packageCost = async (req: Request, res: Response)=> {
       await printingTheCost(id, Name, adj_list, client);
       package_data = await getPackageDependeciesByIDQuery(client,id);
       if (!package_data){
-        console.error(`Package with id:${id} doesn't exist`);
+        
         await client.query("ROLLBACK");
         res.status(404).json({ error: "Package doesn't exist" });
         return;
@@ -1522,7 +1522,7 @@ export const packageCost = async (req: Request, res: Response)=> {
 
     
     if (package_data.rows.length === 0) {
-      console.error(`Package with id:${id} doesn't exist`);
+      
       await client.query("ROLLBACK");
        res.status(404).json({ error: "Package doesn't exist" });
        return;
@@ -1530,14 +1530,14 @@ export const packageCost = async (req: Request, res: Response)=> {
     if(package_data.rows[0].group_id ){
       const userGroupResults=await getUserGroupQuery(userId)
       if(userGroupResults.rows.length==0&&isAdmin!=1){
-        res.status(600).json({"error":"sorry you don't have access to get this package cost "})
-        console.error(`sorry you don't have access to get this package cost as ${userId}`)
+        res.status(409).json({"error":"sorry you don't have access to get this package cost "})
+        
         return 
       }
       log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
       if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&isAdmin!=1 ){
-        res.status(600).json({"error":"sorry you don't have access to get this package cost "})
-        console.error(`sorry you don't have access to get this package cost as ${userId}`)
+        res.status(409).json({"error":"sorry you don't have access to get this package cost "})
+        
         return 
       }
 
@@ -1579,7 +1579,7 @@ log(JSON.stringify(transformedData, null, 2));
 
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error(`Error in getting package dependencies by name ${id}: `, err);
+    
     await client.query('ROLLBACK');
 
     
