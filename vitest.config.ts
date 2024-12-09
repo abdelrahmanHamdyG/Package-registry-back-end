@@ -6,6 +6,12 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts'],
     coverage: {
+      
+      provider: 'istanbul',
+      reporter: ['json-summary', 'html'],
+      reportsDirectory: './coverage',
+      
+      
       exclude: [
         'src/phase_1/workers/busFactorWorker.ts',
         'src/phase_1/workers/codeReviewWorker.ts',
