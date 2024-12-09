@@ -1,97 +1,58 @@
-name: Node.js CI/CD
+name: Test and Coverage
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
+  test-and-coverage:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-  unit-tests:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-    steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm test
+      - name: Install dependencies
+        run: npm install
 
-    # Check if coverage meets the threshold
-    - name: Check Coverage
-      run: |
-        # Ensure the coverage report exists
-        if [ ! -f ./coverage/coverage-summary.json ]; then
-          echo "Coverage report not found. Ensure tests generate coverage data."
-          exit 1
-        fi
-        
-        # Parse the coverage percentage
-        coverage=$(cat ./coverage/coverage-summary.json | jq '.total.lines.pct')
-        
-        # Ensure jq is installed
-        if [ -z "$coverage" ]; then
-          echo "Failed to parse coverage. Ensure jq is installed and the report is valid."
-          exit 1
-        fi
+      - name: Run tests with coverage
+        run: npx vitest --coverage
 
-        # Check if coverage meets threshold
-        if (( $(echo "$coverage < 50" | bc -l) )); then
-          echo "Coverage is below 50% ($coverage%). Failing pipeline."
-          exit 1
-        else
-          echo "Coverage is sufficient: $coverage%"
-        fi
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: unit-tests  # Only run if unit-tests complete successfully
+      - name: Install jq and bc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq bc
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Check Coverage > 50%
+        run: |
+          THRESHOLD=50
+          LINES_PCT=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+          FUNCTIONS_PCT=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+          STATEMENTS_PCT=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+          BRANCHES_PCT=$(jq '.total.branches.pct' coverage/coverage-summary.json)
 
-    - name: Set up SSH agent
-      uses: webfactory/ssh-agent@v0.7.0
-      with:
-        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+          echo "Lines coverage: $LINES_PCT%"
+          echo "Functions coverage: $FUNCTIONS_PCT%"
+          echo "Statements coverage: $STATEMENTS_PCT%"
+          echo "Branches coverage: $BRANCHES_PCT%"
 
-    - name: Sync files to EC2 using rsync
-      run: |
-        rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/PackRegPh2
-
-    - name: Run deployment script on EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/PackRegPh2
-          # Stop any existing server
-          pkill -f "node dist/index.js" || true
-          # Install project dependencies
-          npm install
-          # Compile TypeScript files
-          npm run build
-          # Start the server in the background
-          nohup node dist/index.js > server.log 2>&1 &
-        EOF
+          if (( $(echo "$LINES_PCT < $THRESHOLD" | bc -l) )) || \
+             (( $(echo "$FUNCTIONS_PCT < $THRESHOLD" | bc -l) )) || \
+             (( $(echo "$STATEMENTS_PCT < $THRESHOLD" | bc -l) )) || \
+             (( $(echo "$BRANCHES_PCT < $THRESHOLD" | bc -l) )); then
+            echo "Coverage is below ${THRESHOLD}%!"
+            exit 1
+          else
+            echo "Coverage is above ${THRESHOLD}%!"
+          fi
