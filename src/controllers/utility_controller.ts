@@ -520,45 +520,7 @@ export async function encodeFileToBase64(filePath:string) {
 }
 
 
-export const sanitizeRegexRepetition = (regex: string, maxRepetition: number = 50): string => {
-  // Match patterns like {min,max}, {min,}, {,max}, or {n}
-  return regex.replace(/(\{\s*\d*\s*,?\s*)(\d+)?\s*}/g, (match, prefix, upperBound) => {
-    if (upperBound) {
-      const sanitizedUpperBound = Math.min(parseInt(upperBound, 10), maxRepetition);
-      return `${prefix}${sanitizedUpperBound}}`;
-    }
-    // If no upper bound is specified, set it to maxRepetition
-    return `${prefix}${maxRepetition}}`;
-  });
-};
 
-export const isFullMatchRegex = (regex: string): boolean => {
-  // Check if the regex explicitly starts with ^ and ends with $
-  const fullMatchExplicit = regex.startsWith('^') && regex.endsWith('$');
-
-  return fullMatchExplicit;
-};
-
-
-export const modifyRegexForSubstringMatch = (regex: string, isFullMatch: boolean): string => {
-  if (isFullMatch) {
-    return regex; // No modification needed for full match
-  }
-
-  let modifiedRegex = regex;
-
-  // Add .* to the start if not present
-  if (!/^(\.\*)/.test(modifiedRegex)) {
-    modifiedRegex = `.*${modifiedRegex}`;
-  }
-
-  // Add .* to the end if not present
-  if (!/(\.\*)$/.test(modifiedRegex)) {
-    modifiedRegex = `${modifiedRegex}.*`;
-  }
-
-  return modifiedRegex;
-};
 
 export function removeEscapingBackslashes(password:string) {
   return password.replace(/\\(.)/g, '$1');

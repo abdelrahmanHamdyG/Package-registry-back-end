@@ -1,7 +1,7 @@
 // queries.ts
 import { Client, Pool, PoolClient } from 'pg';
 import pool from '../db.js'; 
-import { get_current_date, isFullMatchRegex, modifyRegexForSubstringMatch, sanitizeRegexRepetition } from '../controllers/utility_controller.js';
+import { get_current_date, } from '../controllers/utility_controller.js';
 
 
 // Get package by ID

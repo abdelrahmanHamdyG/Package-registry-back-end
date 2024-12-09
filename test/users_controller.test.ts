@@ -18,9 +18,10 @@ import {
 import {
   doesGroupExistQuery,
   insertUserToGroupQuery,
+  
 } from '../src/queries/groups_queries';
 import {
-  registerNewUser,
+  registerNewUser, 
   authenticate,
   logout,
   getUserAccess,
@@ -46,6 +47,7 @@ vi.mock('../src/queries/users_queries', () => ({
   removeUserTokenQuery: vi.fn(),
   getUserAccessQuery: vi.fn(),
   updateUserAccessQuery: vi.fn(),
+
 }));
 
 vi.mock('../src/queries/groups_queries', () => ({
@@ -198,17 +200,19 @@ describe('authenticate', () => {
     res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn(),
+      send: vi.fn(),
+      type: vi.fn().mockReturnThis(),
     };
   });
 
-  /*it('should return 200 and a JWT token on successful authentication', async () => {
+  it('should return 200 and a JWT token on successful authentication', async () => {
     req.body = {
       User: { name: 'testuser' },
       Secret: { password: 'password123' },
     };
 
     (getAllUsersWithNameQuery as vi.Mock).mockResolvedValue({
-      rows: [{ id: 1,password_hash: 'hashedpassword', is_admin: true }],
+      rows: [{ id: 1, password_hash: 'hashedpassword', is_admin: true }],
     });
     (bcrypt.compare as vi.Mock).mockResolvedValue(true);
     (jwt.sign as vi.Mock).mockReturnValue('mocktoken');
@@ -217,9 +221,11 @@ describe('authenticate', () => {
     await authenticate(req as Request, res as Response);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ token: 'Bearer mocktoken' });
+    expect(res.type).toHaveBeenCalledWith('text/plain');
+    expect(res.send).toHaveBeenCalledWith(` Bearer mocktoken `);
     expect(insertToUserTokenQuery).toHaveBeenCalledWith(1, 'mocktoken', expect.any(String));
-  });*/
+  });
+
 
   it('should return 400 if required fields are missing', async () => {
     req.body = { User: {}, Secret: {} };

@@ -6,7 +6,9 @@
     "outDir": "./dist",                                  /* Output compiled files to the 'dist' folder. */
     "esModuleInterop": true,                             /* Allow compatibility between ES Modules and CommonJS. */
     "forceConsistentCasingInFileNames": true,            /* Ensure consistent casing in file names. */
-    "skipLibCheck": true,                                /* Skip type checking of declaration files. */
+    "skipLibCheck": true,         
+    "allowSyntheticDefaultImports": true
+    ,
     "strict": true                                       /* Enable strict type checking options. */
   },
   "include": [

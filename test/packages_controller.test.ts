@@ -5,15 +5,16 @@ import bcrypt from 'bcrypt';
 import pool from '../src/db.js';
 import jwt from 'jsonwebtoken';
 import { checkIfIamAdmin} from '../src/controllers/utility_controller';
-import { isValidIdFormat } from '../src/controllers/utility_controller';
-import {canISearchQuery,canIReadQuery,canIUploadQuery,canUserAccessPackageQuery} from '../src/queries/users_queries';
+
+import {canISearchQuery,canIReadQuery,canIUploadQuery,canUserAccessPackageQuery,updateTokenQuery} from '../src/queries/users_queries';
 import {getUserGroupQuery} from '../src/queries/groups_queries'
-import {searchPackagesByQueries,resetRegistry,getPackageByID,searchPackageByRegex,getPackageHistory,getPackageRating} from '../src/controllers/packages_controller'
+import {searchPackagesByQueries,resetRegistry,getPackageByID,searchPackageByRegex,getPackageHistory,getPackageRating,uploadPackage} from '../src/controllers/packages_controller'
 import { resetRegistryQuery,getPackageByIDQuery,insertToPackageHistoryQuery,searchPackagesByRegExQuery,searchPackagesByRegExQueryForAdminQuery,getPackageHistoryQuery,getPackageRatingQuery, checkPackageExistsQuery,insertToPackageHistoryRatingQuery} from '../src/queries/packages_queries.js';
 import { downloadFromS3 } from '../src/s3.js';
+import { processUrl } from '../src/phase_1/cli.js';
 
 
-
+ 
 vi.mock('jsonwebtoken', () => ({
     default: {
       sign: vi.fn(),
@@ -33,42 +34,39 @@ vi.mock('../src/db.js', () => ({
         query: vi.fn(),
         release: vi.fn(),
       }),
-      query:vi.fn()
+      query:vi.fn() 
     },
   }));
-
-vi.mock('../src/controllers/utility_controller', () => ({
-checkIfIamAdmin: vi.fn(),
-}));
-
-vi.mock('../src/queries/groups_queries', () => ({
-getUserGroupQuery: vi.fn(),
-
-}));
-
-vi.mock('../src/queries/users_queries', () => ({
-canIReadQuery: vi.fn(),
-canISearchQuery: vi.fn(),
-canIUploadQuery: vi.fn(),
-canUserAccessPackageQuery:vi.fn()
-}));
-
-vi.mock('../src/queries/packages_queries',()=>({
-
-resetRegistryQuery:vi.fn(),
-getPackageByIDQuery:vi.fn(),
-insertToPackageHistoryQuery:vi.fn(),
-searchPackagesByRegExQuery:vi.fn(),
-searchPackagesByRegExQueryForAdminQuery:vi.fn(),
-getPackageHistoryQuery:vi.fn(),
-getPackageRatingQuery:vi.fn(),
-checkPackageExistsQuery:vi.fn(),
-insertToPackageHistoryRatingQuery:vi.fn()
-}));
-
-
-
-
+  vi.mock('../src/controllers/utility_controller', () => ({
+    checkIfIamAdmin: vi.fn(),
+  }));
+  
+  vi.mock('../src/queries/groups_queries', () => ({
+    getUserGroupQuery: vi.fn(),
+  }));
+  
+  vi.mock('../src/queries/users_queries', () => ({
+    canIReadQuery: vi.fn(),
+    canISearchQuery: vi.fn(),
+    canIUploadQuery: vi.fn(),
+    canUserAccessPackageQuery: vi.fn(),
+    updateTokenQuery: vi.fn(),
+  }));
+  
+  vi.mock('../src/queries/packages_queries', () => ({
+    resetRegistryQuery: vi.fn(),
+    getPackageByIDQuery: vi.fn(),
+    insertToPackageHistoryQuery: vi.fn(),
+    searchPackagesByRegExQuery: vi.fn(),
+    searchPackagesByRegExQueryForAdminQuery: vi.fn(),
+    getPackageHistoryQuery: vi.fn(),
+    getPackageRatingQuery: vi.fn(),
+    checkPackageExistsQuery: vi.fn(),
+    insertToPackageHistoryRatingQuery: vi.fn(),
+  }));
+  
+  
+ 
 describe('searchPackagesByQueries', () => {
   let req: Partial<Request>;
   let res: Partial<Response>;
@@ -96,6 +94,7 @@ describe('searchPackagesByQueries', () => {
   it('should return 200 with packages if user is allowed to search', async () => {
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
     (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
     (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
     (pool.query as vi.Mock).mockResolvedValue({
@@ -111,7 +110,10 @@ describe('searchPackagesByQueries', () => {
 
   it('should return 400 if queries are invalid', async () => {
     req.body = [{ Name: 1 }]; // Missing 'Version'
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
     await searchPackagesByQueries(req as Request, res as Response);
+    
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: 'There is missing field(s) in the PackageQuery or it is formed improperly, or is invalid.',
@@ -120,6 +122,8 @@ describe('searchPackagesByQueries', () => {
 
   it('should return 403 if token is missing', async () => {
     req.headers = {};
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
     await searchPackagesByQueries(req as Request, res as Response);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
@@ -129,6 +133,8 @@ describe('searchPackagesByQueries', () => {
 
   it('should return 405 if user is not allowed to search', async () => {
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
     (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
 
@@ -144,6 +150,8 @@ describe('searchPackagesByQueries', () => {
     (jwt.verify as vi.Mock).mockImplementation(() => {
       throw new Error('Invalid token');
     });
+
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
 
     await searchPackagesByQueries(req as Request, res as Response);
 
@@ -269,6 +277,8 @@ describe("getPackageById",()=>{
     it('should return 200 with package metadata and content if all checks pass', async () => {
         const fakeZipContent = Buffer.from('fakeContent', 'utf8');
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(true);
         (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
         (getPackageByIDQuery as vi.Mock).mockResolvedValue({
@@ -296,6 +306,8 @@ describe("getPackageById",()=>{
     it('should return 400 if id is missing or improperly formed', async () => {
         if(req.params)
             req.params.id = '';
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         await getPackageByID(req as Request, res as Response);
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
@@ -307,6 +319,8 @@ describe("getPackageById",()=>{
     it('should return 403 if authentication token is missing', async () => {
         if(req.headers)
         req.headers['x-authorization'] = '';
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         await getPackageByID(req as Request, res as Response);
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
@@ -319,6 +333,8 @@ describe("getPackageById",()=>{
         (jwt.verify as vi.Mock).mockImplementation(() => {
           throw new Error('TokenExpiredError');
         });
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         await getPackageByID(req as Request, res as Response);
         expect(res.status).toHaveBeenCalledWith(403);
         expect(res.json).toHaveBeenCalledWith({
@@ -329,6 +345,8 @@ describe("getPackageById",()=>{
 
     it('should return 405 if user does not have permission to download', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
         (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: false }] });
         await getPackageByID(req as Request, res as Response);
@@ -341,6 +359,8 @@ describe("getPackageById",()=>{
 
     it('should return 404 if package does not exist', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
         (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
         (getPackageByIDQuery as vi.Mock).mockResolvedValue({ rows: [] });
@@ -353,6 +373,8 @@ describe("getPackageById",()=>{
     it('should return 405 if package is in a restricted group and user does not belong to that group', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(false);
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (canIReadQuery as vi.Mock).mockResolvedValue({ rows: [{ can_download: true }] });
         (getPackageByIDQuery as vi.Mock).mockResolvedValue({
           rows: [{ id: 1, name: 'testPackage', group_id: 123 }],
@@ -399,6 +421,8 @@ describe("searchPackageByRegex",()=>{
     it('should return 200 and metadata if an admin searches successfully', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({
           rows: [
             { id: 1, name: 'package1', version: '1.0.0' },
@@ -422,6 +446,8 @@ describe("searchPackageByRegex",()=>{
     it('should return 200 and metadata if a regular user searches successfully', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
         (getUserGroupQuery as vi.Mock).mockResolvedValue({ rows: [{ group_id: 123 }] });
         (searchPackagesByRegExQuery as vi.Mock).mockResolvedValue({
@@ -443,6 +469,8 @@ describe("searchPackageByRegex",()=>{
 
     it('should return 403 if the token is missing', async () => {
         req.headers = {};
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         await searchPackageByRegex(req as Request, res as Response);
     
         expect(res.status).toHaveBeenCalledWith(403);
@@ -453,6 +481,8 @@ describe("searchPackageByRegex",()=>{
     
     it('should return 403 if the user is not allowed to search', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
         (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
     
@@ -467,6 +497,8 @@ describe("searchPackageByRegex",()=>{
     it('should return 404 if no packages match the regex', async () => {
         (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
         (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+        (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
         (searchPackagesByRegExQueryForAdminQuery as vi.Mock).mockResolvedValue({
           rows: [],
         });
@@ -633,6 +665,7 @@ describe("getPackageRating",()=>{
   it('should return 200 with package rating if all checks pass', async () => {
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
     (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: true }] });
     (canUserAccessPackageQuery as vi.Mock).mockResolvedValue(true);
     (getPackageRatingQuery as vi.Mock).mockResolvedValue({
@@ -684,6 +717,7 @@ describe("getPackageRating",()=>{
   it('should return 400 if package ID is missing or invalid', async () => {
     
       req.params.id = undefined;
+      (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
 
     await getPackageRating(req as Request, res as Response);
 
@@ -696,6 +730,8 @@ describe("getPackageRating",()=>{
   it('should return 402 if user does not have permission to get the rating', async () => {
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(0);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
     (canISearchQuery as vi.Mock).mockResolvedValue({ rows: [{ can_search: false }] });
 
     await getPackageRating(req as Request, res as Response);
@@ -707,6 +743,7 @@ describe("getPackageRating",()=>{
   });
   it('should return 403 if the token is missing', async () => {
     req.headers = {};
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
 
     await getPackageRating(req as Request, res as Response);
 
@@ -721,6 +758,7 @@ describe("getPackageRating",()=>{
     (jwt.verify as vi.Mock).mockImplementation(() => {
       throw new Error('TokenExpiredError');
     });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
 
     await getPackageRating(req as Request, res as Response);
 
@@ -734,6 +772,7 @@ describe("getPackageRating",()=>{
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
     (getPackageRatingQuery as vi.Mock).mockResolvedValue({ rows: [] });
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
 
     await getPackageRating(req as Request, res as Response);
 
@@ -747,6 +786,8 @@ describe("getPackageRating",()=>{
   it('should return 500 if any metric is -1', async () => {
     (jwt.verify as vi.Mock).mockReturnValue({ sub: 1 });
     (checkIfIamAdmin as vi.Mock).mockResolvedValue(1);
+    (updateTokenQuery as vi.Mock).mockResolvedValue({ rows: [{ usage_count: 500 }] });
+
     (getPackageRatingQuery as vi.Mock).mockResolvedValue({
       rows: [
         {
