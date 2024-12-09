@@ -1413,7 +1413,6 @@ export const updatePackage = async (req: Request, res: Response) => {
 };
 
 
-
 export const packageCost = async (req: Request, res: Response)=> {
   let adj_list = new Map<string, { strings: Set<string>; num: number }>();
   const id =Number(req.params.id)
@@ -1421,12 +1420,14 @@ export const packageCost = async (req: Request, res: Response)=> {
   const key = `packages/${id}.zip`;
   log(`PackageCost called with id ${id}`);
   const authHeader = req.headers['x-authorization'] as string;
+  const dependencyHeader = req.headers['dependency'] as string | undefined;
+  const dependency = dependencyHeader ? dependencyHeader.toLowerCase() === 'true' : false;
 
 
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
     res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });
-    
+    console.error(`Unauthorized: Token missing.`)
     return
   }
   try {  
@@ -1440,9 +1441,7 @@ export const packageCost = async (req: Request, res: Response)=> {
     const usageCount = resultTokenQuerey.rows[0].usage_count;
   
     if(usageCount>1000){
-      res.status(403).json({
-        error: 'Authentication failed due to invalid or missing AuthenticationToken.',
-      });
+      res.status(403).json({ error: 'Authentication failed due to invalid or missing AuthenticationToken.' });;
       return
     }
   
@@ -1450,14 +1449,14 @@ export const packageCost = async (req: Request, res: Response)=> {
     const result=await canISearchQuery(userId)    
     if(result.rows.length==0&&isAdmin!=1){
       res.status(500).json({"error":"The package rating system choked on at least one of the metrics."})
-      
+      console.error(`no thing returned from the table for user ${userId}`)
       return
     }
     const canIReadBool=result.rows[0]
     log(canIReadBool)
     if(!canIReadBool.can_search&&isAdmin!=1){
       res.status(400).json({"error":"sorry you don't have access to download this package "})
-      
+      console.error(`sorry you don't have access to download this package as ${userId}`)
       return
     }
     log(`User ${userId} can download packages `)
@@ -1511,7 +1510,7 @@ export const packageCost = async (req: Request, res: Response)=> {
       await printingTheCost(id, Name, adj_list, client);
       package_data = await getPackageDependeciesByIDQuery(client,id);
       if (!package_data){
-        
+        console.error(`Package with id:${id} doesn't exist`);
         await client.query("ROLLBACK");
         res.status(404).json({ error: "Package doesn't exist" });
         return;
@@ -1522,7 +1521,7 @@ export const packageCost = async (req: Request, res: Response)=> {
 
     
     if (package_data.rows.length === 0) {
-      
+      console.error(`Package with id:${id} doesn't exist`);
       await client.query("ROLLBACK");
        res.status(404).json({ error: "Package doesn't exist" });
        return;
@@ -1530,14 +1529,14 @@ export const packageCost = async (req: Request, res: Response)=> {
     if(package_data.rows[0].group_id ){
       const userGroupResults=await getUserGroupQuery(userId)
       if(userGroupResults.rows.length==0&&isAdmin!=1){
-        res.status(409).json({"error":"sorry you don't have access to get this package cost "})
-        
+        res.status(600).json({"error":"sorry you don't have access to get this package cost "})
+        console.error(`sorry you don't have access to get this package cost as ${userId}`)
         return 
       }
       log(`${userGroupResults.rows[0].group_id} and ${package_data.rows[0].group_id}`)
       if(userGroupResults.rows[0].group_id!=package_data.rows[0].group_id &&isAdmin!=1 ){
-        res.status(409).json({"error":"sorry you don't have access to get this package cost "})
-        
+        res.status(600).json({"error":"sorry you don't have access to get this package cost "})
+        console.error(`sorry you don't have access to get this package cost as ${userId}`)
         return 
       }
 
@@ -1554,32 +1553,44 @@ export const packageCost = async (req: Request, res: Response)=> {
 // Convert main package costs to numbers
 const mainPackageStandalone = Number(mainPackage.standalone_cost);
 const mainPackageTotal = Number(mainPackage.total_cost);
-
-const transformedData: Record<string, any> = {
-  [id]: {
-    ...(mainPackageStandalone !== mainPackageTotal && { standaloneCost: mainPackageStandalone/(1024*1024) }),
-    totalCost: mainPackageTotal/(1024*1024),
-  },
-};
+if(!dependency){
+  const transformedData: Record<string, any> = {
+    [id]: {
+      totalCost: mainPackageStandalone/(1024*1024)
+    },
+  };
+  res.status(200).json(transformedData);
+  log(JSON.stringify(transformedData, null, 2));
+}
+else {
+  const transformedData: Record<string, any> = {
+    [id]: {
+      standaloneCost:mainPackageStandalone/(1024*1024),
+      totalCost: mainPackageTotal/(1024*1024)
+    },
+  };
+  package_data.rows.slice(1).forEach((row: any, index: number) => {
+    const standalone = Number(row.standalone_cost);
+    const total = Number(row.total_cost);
+  
+    const dependencyKey = (id + index + 1).toString();
+    transformedData[dependencyKey] = {
+      standaloneCost: standalone/(1024*1024),
+      totalCost: total/(1024*1024),
+    };
+    res.status(200).json(transformedData);
+    log(JSON.stringify(transformedData, null, 2));
+  });
+}
 
 // Add dependencies, incrementing from id+1 upwards
-package_data.rows.slice(1).forEach((row: any, index: number) => {
-  const standalone = Number(row.standalone_cost);
-  const total = Number(row.total_cost);
 
-  const dependencyKey = (id + index + 1).toString();
-  transformedData[dependencyKey] = {
-    ...(standalone !== total && { standaloneCost: standalone/(1024*1024) }),
-    totalCost: total/(1024*1024),
-  };
-});
 
-res.status(200).json(transformedData);
-log(JSON.stringify(transformedData, null, 2));
+
 
   } catch (err) {
     await client.query("ROLLBACK");
-    
+    console.error(`Error in getting package dependencies by name ${id}: `, err);
     await client.query('ROLLBACK');
 
     
