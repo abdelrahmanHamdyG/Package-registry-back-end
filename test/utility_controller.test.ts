@@ -106,9 +106,9 @@ describe('Controller Utilities', () => {
                 return [];
             });
             statSyncMock.mockImplementation((filePath: string) => {
-                if (filePath === '/root/file1') return { isDirectory: () => false } as fs.Stats;
+                if (filePath === '/root/file1') return { isDirectory: () => false,size:100 } as fs.Stats;
                 if (filePath === '/root/subdir') return { isDirectory: () => true } as fs.Stats;
-                if (filePath === '/root/subdir/file2') return { isDirectory: () => false } as fs.Stats;
+                if (filePath === '/root/subdir/file2') return { isDirectory: () => false,size : 200 } as fs.Stats;
                 return { isDirectory: () => false, size:150 } as fs.Stats;
             });
 
